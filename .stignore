@@ -1,0 +1,8 @@
+// 기기별 UI 상태 — 동기화하면 PC/폰이 서로 덮어써서 충돌 사본 생김
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json
+.obsidian/cache
+// 데스크톱 전용 (모바일에 불필요)
+scripts
+// git 이력은 PC 전용 — 폰에 동기화하면 용량·충돌만 생김
+.git

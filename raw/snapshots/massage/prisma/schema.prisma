@@ -1,0 +1,310 @@
+generator client {
+  provider = "prisma-client-js"
+  engineType = "library"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  ADMIN
+  OWNER
+  USER
+}
+
+enum UserStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum QnaStatus {
+  OPEN
+  ANSWERED
+}
+
+enum QnaCommentRole {
+  ADMIN
+  OWNER
+}
+
+enum PartnershipInquiryStatus {
+  PENDING
+  CONTACTED
+  COMPLETED
+}
+
+model User {
+  id             String          @id @default(cuid())
+  email          String          @unique
+  passwordHash   String          @map("password_hash")
+  sessionVersion Int             @default(0) @map("session_version")
+  name           String
+  role           UserRole
+  status         UserStatus      @default(APPROVED)
+  phone          String?
+  managedShopId  String?         @map("managed_shop_id")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+  ownerProfile   OwnerProfile?
+  shops          Shop[]          @relation("UserOwnedShops")
+  reviews        Review[]
+  qna            QnA[]
+  qnaComments    QnAComment[]
+  pageViewEvents PageViewEvent[]
+  createdNotices Notice[]        @relation("NoticeCreatedBy")
+  auditLogs      AuditLog[]      @relation("AuditActor")
+
+  @@index([role, createdAt(sort: Desc)])
+  @@index([status, role])
+  @@map("users")
+}
+
+model OwnerProfile {
+  id             String    @id @default(cuid())
+  userId         String    @unique @map("user_id")
+  businessName   String    @map("business_name")
+  businessNumber String    @map("business_number")
+  approvalMemo   String?   @map("approval_memo")
+  approvedAt     DateTime? @map("approved_at")
+  approvedBy     String?   @map("approved_by")
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("owner_profiles")
+}
+
+model Shop {
+  id             String          @id @default(cuid())
+  ownerId        String?         @map("owner_id")
+  name           String
+  slug           String          @unique
+  region         String
+  subRegion      String?         @map("sub_region")
+  theme          String
+  tagline        String
+  description    String
+  address        String
+  phone          String
+  hours          String
+  isVisible      Boolean         @default(true) @map("is_visible")
+  isPremium      Boolean         @default(false) @map("is_premium")
+  premiumOrder   Int?            @map("premium_order")
+  thumbnailUrl   String?         @map("thumbnail_url")
+  bannerUrl      String?         @map("banner_url")
+  regionLabel    String          @map("region_label")
+  subRegionLabel String?         @map("sub_region_label")
+  themeLabel     String          @map("theme_label")
+  rating         Float           @default(0)
+  reviewCount    Int             @default(0) @map("review_count")
+  searchText     String          @default("") @map("search_text")
+  tags           String[]
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+  owner          User?           @relation("UserOwnedShops", fields: [ownerId], references: [id], onDelete: SetNull)
+  images         ShopImage[]
+  courses        ShopCourse[]
+  reviews        Review[]
+  qna            QnA[]
+  pageViewEvents PageViewEvent[]
+
+  @@index([isVisible, isPremium, premiumOrder, createdAt(sort: Desc)])
+  @@index([isVisible, isPremium, createdAt(sort: Desc)])
+  @@index([isVisible, reviewCount(sort: Desc), rating(sort: Desc), createdAt(sort: Desc)])
+  @@index([isVisible, region, isPremium, premiumOrder, createdAt(sort: Desc)])
+  @@index([isVisible, region, subRegion, isPremium, premiumOrder, createdAt(sort: Desc)])
+  @@index([isVisible, theme, isPremium, premiumOrder, createdAt(sort: Desc)])
+  @@index([ownerId, isPremium, premiumOrder, name])
+  @@index([isVisible, region, isPremium, reviewCount(sort: Desc), rating(sort: Desc), createdAt(sort: Desc)], map: "shops_visible_region_regular_popular_idx")
+  @@index([isVisible, region, subRegion, isPremium, reviewCount(sort: Desc), rating(sort: Desc), createdAt(sort: Desc)], map: "shops_visible_region_sub_region_regular_popular_idx")
+  @@index([isVisible, theme, isPremium, reviewCount(sort: Desc), rating(sort: Desc), createdAt(sort: Desc)], map: "shops_visible_theme_regular_popular_idx")
+  @@index([isVisible, region, reviewCount(sort: Desc), rating(sort: Desc), createdAt(sort: Desc)], map: "shops_visible_region_top_popular_idx")
+  @@index([isVisible, theme, reviewCount(sort: Desc), rating(sort: Desc), createdAt(sort: Desc)], map: "shops_visible_theme_top_popular_idx")
+  @@index([ownerId])
+  @@index([region, subRegion, theme])
+  @@map("shops")
+}
+
+model ShopImage {
+  id        String   @id @default(cuid())
+  shopId    String   @map("shop_id")
+  imageUrl  String   @map("image_url")
+  sortOrder Int      @default(0) @map("sort_order")
+  shop      Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@index([shopId, sortOrder])
+  @@map("shop_images")
+}
+
+model ShopCourse {
+  id              String   @id @default(cuid())
+  shopId          String   @map("shop_id")
+  name            String
+  durationMinutes Int      @map("duration_minutes")
+  price           Int
+  description     String?
+  sortOrder       Int      @default(0) @map("sort_order")
+  shop            Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@index([shopId, sortOrder])
+  @@map("shop_courses")
+}
+
+model Review {
+  id         String   @id @default(cuid())
+  shopId     String   @map("shop_id")
+  userId     String   @map("user_id")
+  authorName String   @map("author_name")
+  rating     Int
+  content    String
+  isHidden   Boolean  @default(false) @map("is_hidden")
+  createdAt  DateTime @default(now()) @map("created_at")
+  shop       Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([shopId, createdAt(sort: Desc)])
+  @@index([shopId, isHidden, createdAt(sort: Desc)])
+  @@map("reviews")
+}
+
+model QnA {
+  id         String       @id @default(cuid())
+  shopId     String?      @map("shop_id")
+  userId     String?      @map("user_id")
+  authorName String       @map("author_name")
+  question   String
+  status     QnaStatus    @default(OPEN)
+  createdAt  DateTime     @default(now()) @map("created_at")
+  shop       Shop?        @relation(fields: [shopId], references: [id], onDelete: SetNull)
+  user       User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  comments   QnAComment[]
+
+  @@index([status, createdAt(sort: Desc)])
+  @@index([shopId, createdAt(sort: Desc)])
+  @@map("qna")
+}
+
+model QnAComment {
+  id         String         @id @default(cuid())
+  qnaId      String         @map("qna_id")
+  userId     String?        @map("user_id")
+  authorName String         @map("author_name")
+  role       QnaCommentRole
+  content    String
+  createdAt  DateTime       @default(now()) @map("created_at")
+  qna        QnA            @relation(fields: [qnaId], references: [id], onDelete: Cascade)
+  user       User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([qnaId, createdAt(sort: Asc)])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("qna_comments")
+}
+
+model Notice {
+  id        String   @id @default(cuid())
+  title     String
+  content   String
+  isPinned  Boolean  @default(false) @map("is_pinned")
+  createdBy String   @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  creator   User     @relation("NoticeCreatedBy", fields: [createdBy], references: [id], onDelete: Cascade)
+
+  @@index([isPinned, createdAt(sort: Desc)])
+  @@map("notices")
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  actorUserId String   @map("actor_user_id")
+  action      String
+  targetType  String   @map("target_type")
+  targetId    String   @map("target_id")
+  payload     Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+  actor       User     @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: Cascade)
+
+  @@index([actorUserId, createdAt(sort: Desc)])
+  @@index([targetType, targetId, createdAt(sort: Desc)])
+  @@map("audit_logs")
+}
+
+model PartnershipInquiry {
+  id          String                   @id @default(cuid())
+  shopName    String                   @map("shop_name")
+  region      String
+  subRegion   String                   @map("sub_region")
+  theme       String
+  contactName String                   @map("contact_name")
+  phone       String
+  kakaoId     String?                  @map("kakao_id")
+  message     String
+  status      PartnershipInquiryStatus @default(PENDING)
+  createdAt   DateTime                 @default(now()) @map("created_at")
+  updatedAt   DateTime                 @updatedAt @map("updated_at")
+
+  @@index([status, createdAt(sort: Desc)])
+  @@map("partnership_inquiries")
+}
+
+model SiteSettings {
+  id                 String   @id
+  siteName           String   @map("site_name")
+  siteTitle          String   @map("site_title")
+  siteDescription    String   @map("site_description")
+  heroMainText       String   @map("hero_main_text")
+  heroSubText        String   @map("hero_sub_text")
+  contactPhone       String   @map("contact_phone")
+  footerInfo         String   @map("footer_info")
+  seoSection1Title   String   @map("seo_section_1_title")
+  seoSection1Content String   @map("seo_section_1_content")
+  seoSection2Title   String   @map("seo_section_2_title")
+  seoSection2Content String   @map("seo_section_2_content")
+  seoSection3Title   String   @map("seo_section_3_title")
+  seoSection3Content String   @map("seo_section_3_content")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  @@map("site_settings")
+}
+
+model Theme {
+  code      String   @id
+  label     String
+  emoji     String   @default("")
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("themes")
+}
+
+model PageViewEvent {
+  id        String   @id @default(cuid())
+  path      String
+  sessionId String   @map("session_id")
+  userId    String?  @map("user_id")
+  shopId    String?  @map("shop_id")
+  ipHash    String?  @map("ip_hash")
+  userAgent String?  @map("user_agent")
+  referrer  String?
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  shop      Shop?    @relation(fields: [shopId], references: [id], onDelete: SetNull)
+
+  @@index([sessionId, createdAt(sort: Desc)])
+  @@index([createdAt(sort: Desc), sessionId])
+  @@index([path, createdAt(sort: Desc)])
+  @@index([shopId, createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("page_view_events")
+}
+
+model AdBanner {
+  slot      String   @id
+  imageUrl  String   @map("image_url")
+  linkUrl   String?  @map("link_url")
+  isActive  Boolean  @default(true) @map("is_active")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("ad_banners")
+}

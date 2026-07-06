@@ -1,0 +1,5 @@
+# This directory is a Syncthing folder marker.
+# Do not delete.
+
+folderID: wiki
+created: 2026-07-05T23:59:57+09:00
