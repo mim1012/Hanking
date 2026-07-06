@@ -18,3 +18,6 @@
 - 2026-07-06 | Lint | lint 보강(log.md 형식·날짜순 검사, 공백·괄호 경로 정규식) + KIS자동매매 페이지 어긋난 참조 2건 실파일 검증 후 교정. 결과: 90/90 유효
 - 2026-07-06 | 배선 | 코덱스 위키 연동 새 세션 2건 end-to-end 검증 — 글로벌 규칙으로 README→concept→원본 줄번호 대조까지 자율 수행, `_wiki` 내에서 AGENTS.md 스키마(승격 게이트·log 규칙) 네이티브 로드 확인
 - 2026-07-06 | Compile | MOC 2종 신설([[MOC-개념]]·[[MOC-프로젝트]], Dataview 자동 목록+최근 7일 뷰) + Dataview v0.5.68 설치·활성화. README에 링크 및 AGENTS.md 스키마 포인터 반영
+- 2026-07-06 | 배선 | 수주 킥오프 절차 신설(`contract-project-gates.md` 0절: AGENTS.md 골든플로우 스캐폴딩→위키 등록→스펙 스텁) — 코덱스 글로벌엔 포인터만
+- 2026-07-06 | Ingest | massage 정본 스냅샷 → `raw/snapshots/massage/` (50파일 134KB, 해시 대조). 원본 폴더 삭제 대비
+- 2026-07-06 | 배선 | git 백업 시작(초기 커밋 3392d06) + 스키마 규칙 8(사이클 후 커밋) + `.git`은 Syncthing 제외
