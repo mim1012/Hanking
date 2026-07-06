@@ -23,3 +23,4 @@
 - 2026-07-06 | 배선 | git 백업 시작(초기 커밋 3392d06) + 스키마 규칙 8(사이클 후 커밋) + `.git`은 Syncthing 제외
 - 2026-07-06 | Compile | massage 원본 폴더 삭제 대비 — 위키 참조 전부 스냅샷 경로(`_wiki/raw/snapshots/massage/`)로 재지향, 참조 파일 2건(communityStore·shop-store) 스냅샷 추가. GitHub `mim1012/massage`에 전 이력 푸시 확인
 - 2026-07-06 | Compile | dorami 채팅 두더지잡기 포렌식(git 3,597커밋 + 코드) — 실패 패턴 5종 명명해 [[project-dorami]] 교훈·[[실시간-스트리밍-소켓아키텍처]] 함정/dead-end 등재. dorami AGENTS.md에 Chat Regression Contract(정책 불변식·공유 4파일 동반 스모크·스펙 공백) 배선
+- 2026-07-06 | Compile | fablize 플러그인 평가→흡수 결정 등재 — 소스 3층 분해(텍스트/훅/엔진) 후 investigation-protocol의 "경쟁 가설 3개+·기각 보고"만 `.claude/rules/fable5-operating-mode.md` §6에 흡수(미설치). kulaxyz에 이은 2번째 동일 패턴이라 [[하네스-플러그인-흡수-vs-설치]] concept 신설(개념 24→25). 함정: 이중 지침 드리프트·Windows fail-open 훅 무효과. dead-end: setup.sh global 주입
