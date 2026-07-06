@@ -21,3 +21,4 @@
 - 2026-07-06 | 배선 | 수주 킥오프 절차 신설(`contract-project-gates.md` 0절: AGENTS.md 골든플로우 스캐폴딩→위키 등록→스펙 스텁) — 코덱스 글로벌엔 포인터만
 - 2026-07-06 | Ingest | massage 정본 스냅샷 → `raw/snapshots/massage/` (50파일 134KB, 해시 대조). 원본 폴더 삭제 대비
 - 2026-07-06 | 배선 | git 백업 시작(초기 커밋 3392d06) + 스키마 규칙 8(사이클 후 커밋) + `.git`은 Syncthing 제외
+- 2026-07-06 | Compile | massage 원본 폴더 삭제 대비 — 위키 참조 전부 스냅샷 경로(`_wiki/raw/snapshots/massage/`)로 재지향, 참조 파일 2건(communityStore·shop-store) 스냅샷 추가. GitHub `mim1012/massage`에 전 이력 푸시 확인
