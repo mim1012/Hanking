@@ -26,6 +26,19 @@
 - `backend/src/modules/notifications/push-notification.service.ts:16` — Web Push(VAPID). `notifications/clients/kakao-talk.client.ts` — Kakao 알림톡(Bizgo). `NotificationTemplate`:451 — DB 템플릿.
 - 주문은 `BANK_TRANSFER`/`PENDING`으로 생성, 판매자 입금확인 후 CONFIRMED(`depositorName` 매칭). PG API 연동 없음.
 
+## 교훈 — 채팅 두더지잡기 포렌식 (2026-07-06, git 3,597커밋 + 코드 분석)
+
+채팅/소켓 fix 커밋 154+건, 최악 구간은 이틀 18 fix(04-26~27). 이름 붙인 실패 패턴 5개:
+1. **삼중 소켓 진입점** — `main.ts` 수동 /chat 핸들러 + websocket.gateway + chat.gateway 공존. ChatGateway 리팩토링→revert→제거(`969dee42`→`12649ce3`→`2c2cc97e`).
+2. **인증-게스트 진자** — 채팅 전송 정책이 "인증 강제↔게스트 허용"을 이틀에 4회 왕복(`faf4556b`↔`04437ed3` 등). 정책 결정이 기록 안 돼 세션마다 재발명.
+3. **토큰 만료 소켓사** — 1h+ 방송 중 access 만료→재연결 handshake 실패. 2월~7월 동일 증상 반복(`969dee42`, `3861cedc`, `718be805`, `ec9ee5a0`).
+4. **재연결 잡음/유령 소켓** — rapid unmount로 중복 소켓·메모리 누수(`4ddc5f3b`, `1fbb2bf9`).
+5. **환경별 전송 미스매치** — ws/wss·namespace·localhost fallback(`74cab857`, `9a3ee03a`, `c80af29e`).
+
+**구조 원인**: 채팅 배관은 격리돼 있으나 (a) 단일 `authenticateSocket`(`backend/src/common/middleware/ws-jwt-auth.middleware.ts:145`)을 전 네임스페이스가 공유, (b) refresh 싱글톤(`client-app/src/lib/api/client.ts:56`)을 HTTP+전 소켓이 공유, (c) 채팅 마운트가 auth store에 종속(`client-app/src/app/live/[streamKey]/page.tsx:192` liveChatEnabled) — 그래서 채팅 fix가 auth를 건드리고 auth fix가 채팅을 터뜨림. **골든플로우 #2는 있으나 스펙이 종이호랑이**: `client-app/e2e/chat-send-message.spec.ts:122` 수신 검증이 hard expect 없이 로그만, 셀렉터가 모바일 placeholder와 불일치해 조용히 스킵. 백엔드 소켓 통합테스트 0개.
+
+**처방**(dorami AGENTS.md 골든플로우 절에 반영): 정책 불변식 명문화, 공유 레이어 4파일 수정 시 동반 스모크 의무, 스펙에 hard assert. 상세 함정 목록 → [[실시간-스트리밍-소켓아키텍처]].
+
 ## 미확인 (추가 조사 필요)
 - Settlement 커미션 계산/레코드 생성 위치(현 서비스는 조회/엑셀만). ChatMessage DB 영속화 경로(소켓은 Redis만).
 
