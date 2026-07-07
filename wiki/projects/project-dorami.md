@@ -8,7 +8,7 @@
 - `backend/src/modules/points/points.service.ts:192` `deductPointsTx` — 포인트 원자적 차감(동일 패턴). → [[원자적-조건부-감소]]
 - `backend/src/modules/orders/orders.service.ts:210` — 다건 락 순서 정렬 데드락 방지(`withOrderTransactionRetry`로 감싸는 재시도 트랜잭션, `:102`).
 - `backend/src/modules/reservation/reservation.service.ts:207` — 예약 대기열 WAITING→PROMOTED 승격 + 만료 크론(`:256`).
-- `backend/src/modules/auth/auth.service.ts:397` `_doRefreshToken` — Redis NX 락을 먼저 획득한 뒤 세션 비교/토큰 로테이션(락-먼저-비교 패턴). 락 경합 시 `waitForCachedRefreshResult`로 결과를 폴링·재사용 — 동시 리프레시로 인한 대량 로그아웃 방지. → [[요청-코얼레싱-인플라이트]] [[웹앱-인증-세션-계층]]
+- `backend/src/modules/auth/auth.service.ts:397` `_doRefreshToken` — Redis NX 락을 먼저 획득한 뒤 세션 비교/토큰 로테이션(락-먼저-비교 패턴). 락 경합 시 `waitForCachedRefreshResult`로 결과를 폴링·재사용 — 동시 리프레시로 인한 대량 로그아웃 방지. → [[실시간-토큰리프레시-락-먼저-비교]] [[요청-코얼레싱-인플라이트]] [[웹앱-인증-세션-계층]]
 - `client-app/src/lib/hooks/use-auth.ts:84` `fetchCurrentUser` — 세션 부트스트랩 401 처리: 저장된 로그인 정보가 있는 상태에서 `/users/me`가 401을 반환하면 즉시 anonymous로 떨어뜨리지 않고 리프레시 1회 + 재검증을 시도(`:67` `hasPersistedIdentity` 가드). 리프레시 자체가 실패해도 서버가 리프레시 쿨다운을 걸지 않은 경우(`getRefreshCooldownRemainingMs() === 0`)는 "진짜 만료"가 아닌 일시적 장애로 간주해 `BootstrapRecoverableError`(`:43`)를 던지고 `resolveBootstrapFailure`(`:50`)가 기존 로그인 상태를 유지(fail-open). 만료 접속-복구형 세션 부트스트랩의 재사용 가능한 형태. → [[웹앱-인증-세션-계층]]
 
 ### 실시간 스트리밍
@@ -57,4 +57,4 @@
 - Settlement 커미션 계산/레코드 생성 위치 — 여전히 미확인. `prisma.settlement.create()` 호출이 코드베이스 전체에 0건(grep 확인); `settlement.service.ts`는 조회·엑셀 리포트만 구현. `Settlement.commission` 컬럼(schema.prisma:551)은 존재하지만 채우는 코드가 없다.
 - ChatMessage DB 영속화 경로 — 여전히 소켓은 Redis만 사용(`main.ts` `/chat` 핸들러가 `chat:{liveId}:history`에만 씀). 다만 `ChatMessage` 테이블 자체는 schema.prisma:135에 존재하고, `admin.service.ts:1285,1291`이 최근 7일 카운트 쿼리 대상으로 읽는다 — 즉 어드민 대시보드가 항상 0을 반환하는 죽은 지표를 노출 중일 가능성.
 
-## 의존 개념: [[원자적-조건부-감소]] · [[실시간-스트리밍-소켓아키텍처]] · [[웹앱-인증-세션-계층]] · [[정산-포인트-원장]] · [[멀티에이전트-역할오케스트레이션]] · [[요청-코얼레싱-인플라이트]]
+## 의존 개념: [[원자적-조건부-감소]] · [[실시간-스트리밍-소켓아키텍처]] · [[웹앱-인증-세션-계층]] · [[정산-포인트-원장]] · [[멀티에이전트-역할오케스트레이션]] · [[요청-코얼레싱-인플라이트]] · [[실시간-토큰리프레시-락-먼저-비교]]
