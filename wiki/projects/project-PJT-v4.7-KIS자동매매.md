@@ -5,7 +5,7 @@
 ## PJT 폴더 관계 (중요)
 - `PJT v4.6 (…원본`, `PJT v4.6 (09.23 수정본 반영` — **둘 다 빈 껍데기**(`nul` 파일만, 내용 소실). 재사용 자산 없음. (재확인 2026-07-07)
 - `PJT v4.7 1023 new (2)/` — 컨테이너(문서/zip/배포본). **실제 소스는 중첩 폴더 `PJT v4.7 1023 new/`** (dev), 배포는 `AutoTrading_Release/` (CLAUDE.md:15-22).
-- `PJT v4.7 1023 new/`에 **두 번째 CLAUDE.md**가 있다(6월 12 갱신, 14KB) — FastAPI 대시보드(`api_server.py`)·Flutter 앱(`mobile_app/`)·Dante 스크리너 파이프라인(`common/screener*.py`, `scripts/eod_scan.py`)·TradingAgents LLM 필터(`common/ta_filter.py`) 등 최상위 CLAUDE.md에 없는 최근 서브시스템을 문서화. 최상위 CLAUDE.md의 `파일:줄` 인용은 이 갱신과 무관하게 여전히 유효(같은 라인 유지).
+- `PJT v4.7 1023 new/`에 **두 번째 CLAUDE.md**가 있다(6월 12 갱신, 14KB) — FastAPI 대시보드(`api_server.py`)·Flutter 앱(`mobile_app/`)·Dante 스크리너 파이프라인(`common/screener*.py`, `scripts/eod_scan.py`)·TradingAgents LLM 필터(`common/ta_filter.py`) 등 최상위 CLAUDE.md에 없는 최근 서브시스템을 문서화. 최상위 CLAUDE.md의 `파일:줄` 인용은 이 갱신과 무관하게 여전히 유효(같은 라인 유지). **2026-07-07 딥업데이트로 이 네 서브시스템 전부 인제스트 완료 — 아래 "Dante 스크리너 / LLM 필터 / 모바일 API" 절 참고.**
 
 ## 핵심 자산 (다른 곳에서 주워올 것)
 - `common/base_api.py`, `base_strategy.py`, `base_token_manager.py` — ABC 상속으로 US/KR 파생(멀티마켓 확장 템플릿, CLAUDE.md:100-119).
@@ -18,7 +18,15 @@
 - `PJT v4.7 1023 new (2)/PJT v4.7 1023 new/common/credential_store.py:24` — `_mask()`(:24) + `patch_credentials()`(:63): 모바일 API가 KIS 자격증명을 갱신해도 **평문 시크릿을 절대 응답에 포함하지 않고** 마스킹된 메타데이터만 반환. `.env`는 임시파일 쓰기 + `os.replace`로 원자적 재작성(:107-109). 시크릿을 다루는 CRUD API에 이식 가능.
 - `PJT v4.7 1023 new (2)/PJT v4.7 1023 new/common/settings_store.py:142` — `_apply_to_config_modules()`: `settings.json` 패치 시 이미 import된 `config`/`kr.config`/`us.config`를 `sys.modules` 순회로 즉시 hot-patch — 프로세스 재시작 없이 실행 중인 트레이딩 루프에 반영. `config.py`(기본값) → `.env`(시크릿) → `settings.json`(런타임 오버라이드) 3단 레이어링, 나중 값이 승리.
 
+### Dante 스크리너 / LLM 필터 / 모바일 API (2026-07-07 딥인제스트)
+- **API 인증 + 응답 봉투** — `PJT v4.7 1023 new (2)/PJT v4.7 1023 new/api_server.py:45` (`verify_api_key`, `secrets.compare_digest`로 타이밍공격 방지 `X-API-Key` 검증) + `:54` (`ok()`/`fail()` — `{success,data,timestamp}` / `{success,error,code}` 일관 봉투, 전 `/api/v1/*` 엔드포인트 공용). → [[웹앱-인증-세션-계층]]
+- **발굴스캔 인플라이트 코얼레싱** — `PJT v4.7 1023 new (2)/PJT v4.7 1023 new/api_server.py:1209` `_try_start_discovery_scan()`: `_discovery_scan_lock.acquire(blocking=False)`로 주기 스캔 루프(20초 후 최초 1회, 이후 `DISCOVERY_SCAN_INTERVAL_SEC`)와 수동 트리거(`POST /api/v1/discovery/scan`)가 같은 락을 공유 — 중복 EOD 스캔 동시 실행 원천 차단. 스레드 생성 자체가 실패해도 락을 즉시 해제(`:1243`)해 영구 점유를 막는다. → [[요청-코얼레싱-인플라이트]]
+- **Dante 발굴 스크리너 파이프라인** — `PJT v4.7 1023 new (2)/PJT v4.7 1023 new/common/screener.py:59` `screen()`: 세력봉(양봉+상승률+몸통비율)·거래량급증·이평 정배열/혼조·이격도상한 4조건 AND, 순수함수(`list[Candle]` 입력, API/IO 없음). `PJT v4.7 1023 new (2)/PJT v4.7 1023 new/scripts/eod_scan.py:206` `_scan()`: KR/US 전 유니버스에 breakout/reversal/good_entry/단테 추가검색기(`_DANTE_SCREENS`)를 동일 일봉 재사용으로 일괄 평가, `screen_good_entry` 통과분만 발굴 랭킹 소스로 채택(`:288` `_ranked_candidates`, 손익비(RR)≥4 우선 → MA20 근접순). `PJT v4.7 1023 new (2)/PJT v4.7 1023 new/common/dante_candidates.py:11` — `DanteCandidate`(frozen dataclass) + `write_candidate_artifact()`로 발굴 결과를 버전 있는 JSON(`eod_{market}_{date}_candidates.json`)으로 저장 — 발굴 배치와 라이브 루프 사이의 스키마 계약. **의도적 dead-end**: 검색기 교차확인 개수(`_consensus()`)로 랭킹하던 이전 방식은 성격이 반대인 검색기(바닥반전 vs 추세추종)가 섞여 이미 급등/하락중인 종목을 상위에 올리는 문제가 있어 폐기(`eod_scan.py:291`). 테스트: `tests/test_dante_faithful_daily.py` 4/4 PASS.
+- **TradingAgents LLM 필터 — provenance 기반 리스크 게이트** — `PJT v4.7 1023 new (2)/PJT v4.7 1023 new/common/ta_filter.py:141` `is_bullish()`: 핀 종목(`injected=False`, 사람이 고른 종목)은 신호없음/Hold 시 **fail-open**(통과 유지, 기존 호출부 하위호환), 자동주입 종목(`injected=True`, EOD 발굴 파이프라인이 넣은 미검토 종목)은 동일 상황에서 **fail-closed**(차단) — 사람 검토 여부로 신뢰수준을 분기하는 게이트. 시장별 독립 캐시 유효성(`_cache_valid_for_market`, KR 08:45 KST/US 09:15 ET 사전분석)으로 "KR 실행 직후 타임스탬프 공유 때문에 US 분석이 매일 스킵되는" 이중 결함(H-1)을 수정. KR은 TradingAgents(미국뉴스 중심이라 한국 종목 분석이 부실) 대신 네이버뉴스+DeepSeek 직접분석으로 라우팅(dead-end: TradingAgents 단독 KR 분석 폐기). → [[리스크-관리-상태기계]]
+- **파일뮤텍스 + 원자적 캐시** — `PJT v4.7 1023 new (2)/PJT v4.7 1023 new/common/ta_filter.py:31` `_acquire_lock()/_release_lock()`: `os.open(O_CREAT|O_EXCL)` 센티널로 배타락(외부 `filelock` 의존성 없음), 10분 초과 lock은 죽은 프로세스로 간주해 강제해제, 30초 타임아웃 시 `TimeoutError`. `_save_cache()`는 `stock_config_store.atomic_replace_with_retry`를 재사용(Windows 공유위반 재시도 로직 중복 방지). 테스트: `tests/test_ta_filter_cache.py` 8/8 PASS. → [[파일기반-지속메모리]]
+- **Flutter `ApiClient`** — `PJT v4.7 1023 new (2)/PJT v4.7 1023 new/mobile_app/lib/main.dart:77` — 외부 `http` 패키지 없이 `dart:io HttpClient` 직접 사용, 서버 응답 봉투(`success`/`data`) 자동 언랩(`:138`), 연결 8초/응답 15초 타임아웃, `SocketException`/`TimeoutException`을 한국어 사용자 메시지의 `ApiException`으로 변환. `api_server.py`의 `ok()/fail()` 봉투와 1:1 대응하는 클라이언트측 파트너 구현.
+
 ## 주의점
 - `secret.json`, `*_api_token.json`이 소스에 평문 존재(민감정보).
 
-## 의존 개념: [[KIS-API-계좌포맷]] · [[포트-어댑터-거래소추상화]] · [[리스크-관리-상태기계]]
+## 의존 개념: [[KIS-API-계좌포맷]] · [[포트-어댑터-거래소추상화]] · [[리스크-관리-상태기계]] · [[웹앱-인증-세션-계층]] · [[요청-코얼레싱-인플라이트]] · [[파일기반-지속메모리]]

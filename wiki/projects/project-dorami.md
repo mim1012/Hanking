@@ -9,12 +9,17 @@
 - `backend/src/modules/orders/orders.service.ts:210` — 다건 락 순서 정렬 데드락 방지(`withOrderTransactionRetry`로 감싸는 재시도 트랜잭션, `:102`).
 - `backend/src/modules/reservation/reservation.service.ts:207` — 예약 대기열 WAITING→PROMOTED 승격 + 만료 크론(`:256`).
 - `backend/src/modules/auth/auth.service.ts:397` `_doRefreshToken` — Redis NX 락을 먼저 획득한 뒤 세션 비교/토큰 로테이션(락-먼저-비교 패턴). 락 경합 시 `waitForCachedRefreshResult`로 결과를 폴링·재사용 — 동시 리프레시로 인한 대량 로그아웃 방지. → [[요청-코얼레싱-인플라이트]] [[웹앱-인증-세션-계층]]
+- `client-app/src/lib/hooks/use-auth.ts:84` `fetchCurrentUser` — 세션 부트스트랩 401 처리: 저장된 로그인 정보가 있는 상태에서 `/users/me`가 401을 반환하면 즉시 anonymous로 떨어뜨리지 않고 리프레시 1회 + 재검증을 시도(`:67` `hasPersistedIdentity` 가드). 리프레시 자체가 실패해도 서버가 리프레시 쿨다운을 걸지 않은 경우(`getRefreshCooldownRemainingMs() === 0`)는 "진짜 만료"가 아닌 일시적 장애로 간주해 `BootstrapRecoverableError`(`:43`)를 던지고 `resolveBootstrapFailure`(`:50`)가 기존 로그인 상태를 유지(fail-open). 만료 접속-복구형 세션 부트스트랩의 재사용 가능한 형태. → [[웹앱-인증-세션-계층]]
 
 ### 실시간 스트리밍
 - `backend/src/modules/streaming/streaming.service.ts:1044` `authenticateStream()` — SRS `on_publish` 웹훅 인증 + LIVE 전이(만료 48h 연장, Redis 캐시 갱신). 실제 HTTP 진입점은 `streaming.controller.ts:382`(`POST srs-auth`). → [[실시간-스트리밍-소켓아키텍처]]
 - `backend/src/modules/websocket/socket-io.provider.ts:21` — 서비스→소켓 브로드캐스트 싱글턴.
 - `backend/src/modules/restream/restream.service.ts:260` — FFmpeg 멀티플랫폼 재송출(유튜브/인스타/틱톡).
 - `backend/src/main.ts:491` `/chat` — 실시간 채팅(전송 레이트리밋 20/10s at `:568`, XSS 제거, Redis 히스토리 100개/24h, ADMIN 모더레이션).
+- `backend/src/modules/streaming/streaming.controller.ts:104` `armDevTestStream` (`GET /api/streaming/dev/arm-test-stream`) — 라이브 방송 테스트용 "안전한 dev 백도어" 패턴: 고정 스트림키를 PENDING으로 재무장해 인코더(OBS/PRISM) 재설정 없이 반복 테스트를 가능케 함. 이중 게이트(`:114` `ENABLE_DEV_AUTH==='true'` AND `:122` `APP_ENV==='staging' || localhost`)로 프로덕션은 컴파일 시점이 아니라 설정값 두 곳(compose 하드코드 `false` + `APP_ENV=production`)에서 각각 독립적으로 차단 — 보안 리뷰가 "compose 게이트가 리팩터링돼도 여전히 막힌다"를 별도 계층에서 검증한 사례. 다른 프로젝트의 스테이징 전용 테스트 보조 엔드포인트 설계에 재사용 가능.
+
+### 클라이언트 상태 관리 (Next.js)
+- `client-app/src/hooks/useLiveLayoutMachine.ts:73` `deriveSnapshot` + `:92` `computeLayout` — 4개의 독립 상태축(connection/stream/uiMode/overlay, 각각 별도 리듀서 `:142`~`:212`)을 하나의 `LiveSnapshot` enum(`LIVE_NORMAL`/`LIVE_TYPING`/`RETRYING`/`NO_STREAM`/`ENDED`)으로 합성한 뒤, 그 enum만으로 UI 레이아웃(`LiveLayout`)을 순수 함수로 도출하는 패턴. 리듀서는 비공개(`:142`)로 캡슐화하고 파생 함수만 `export`해 유닛테스트 대상을 좁힘. 실시간성이 있고 상태축이 여러 개인 UI(재생/연결/입력모드/오버레이가 서로 얽히는 화면) 일반에 재사용 가능한 "다축 리듀서 + 스냅샷 파생 + 레이아웃 프로젝션" 아키텍처.
 
 ### 인증 / 원장 / 인프라
 - `backend/src/modules/auth/strategies/jwt.strategy.ts:36` — JWT 즉시폐기(블랙리스트 이중체크 + AuthSession 세션폐기, 가용성 우선 degrade). → [[웹앱-인증-세션-계층]]
