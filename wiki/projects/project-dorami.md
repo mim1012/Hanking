@@ -6,14 +6,15 @@
 ### 동시성 (dorami 최고 자산)
 - `backend/src/modules/orders/inventory.service.ts:104` — 재고 원자적 조건부 감소 (canonical). → [[원자적-조건부-감소]]
 - `backend/src/modules/points/points.service.ts:192` `deductPointsTx` — 포인트 원자적 차감(동일 패턴). → [[원자적-조건부-감소]]
-- `backend/src/modules/orders/orders.service.ts:210` — 다건 락 순서 정렬 데드락 방지 + 재시도 트랜잭션.
+- `backend/src/modules/orders/orders.service.ts:210` — 다건 락 순서 정렬 데드락 방지(`withOrderTransactionRetry`로 감싸는 재시도 트랜잭션, `:102`).
 - `backend/src/modules/reservation/reservation.service.ts:207` — 예약 대기열 WAITING→PROMOTED 승격 + 만료 크론(`:256`).
+- `backend/src/modules/auth/auth.service.ts:397` `_doRefreshToken` — Redis NX 락을 먼저 획득한 뒤 세션 비교/토큰 로테이션(락-먼저-비교 패턴). 락 경합 시 `waitForCachedRefreshResult`로 결과를 폴링·재사용 — 동시 리프레시로 인한 대량 로그아웃 방지. → [[요청-코얼레싱-인플라이트]] [[웹앱-인증-세션-계층]]
 
 ### 실시간 스트리밍
-- `backend/src/modules/streaming/streaming.service.ts:982` — SRS webhook 방송 전이. → [[실시간-스트리밍-소켓아키텍처]]
+- `backend/src/modules/streaming/streaming.service.ts:1044` `authenticateStream()` — SRS `on_publish` 웹훅 인증 + LIVE 전이(만료 48h 연장, Redis 캐시 갱신). 실제 HTTP 진입점은 `streaming.controller.ts:382`(`POST srs-auth`). → [[실시간-스트리밍-소켓아키텍처]]
 - `backend/src/modules/websocket/socket-io.provider.ts:21` — 서비스→소켓 브로드캐스트 싱글턴.
 - `backend/src/modules/restream/restream.service.ts:260` — FFmpeg 멀티플랫폼 재송출(유튜브/인스타/틱톡).
-- `backend/src/main.ts:491` `/chat` — 실시간 채팅(레이트리밋 20/10s, XSS 제거, Redis 히스토리 100개/24h, ADMIN 모더레이션).
+- `backend/src/main.ts:491` `/chat` — 실시간 채팅(전송 레이트리밋 20/10s at `:568`, XSS 제거, Redis 히스토리 100개/24h, ADMIN 모더레이션).
 
 ### 인증 / 원장 / 인프라
 - `backend/src/modules/auth/strategies/jwt.strategy.ts:36` — JWT 즉시폐기(블랙리스트 이중체크 + AuthSession 세션폐기, 가용성 우선 degrade). → [[웹앱-인증-세션-계층]]
@@ -21,12 +22,14 @@
 - `backend/src/common/services/encryption.service.ts:22` — AES-256-GCM 봉투 암호화 + 키 로테이션(배송지).
 - `backend/src/common/filters/business-exception.filter.ts:48` — 프로덕션 context 마스킹(재고수/내부ID 유출 방지). `common/interceptors/transform.interceptor.ts` — `{data,success,timestamp}` 표준.
 - `common/throttler/throttler.config.ts` — 3티어 레이트리밋. `common/adapters/redis-io.adapter.ts` — 멀티인스턴스.
+- `docker-compose.prod.yml:87` `NODE_OPTIONS: --max-old-space-size=768` + `backend/src/modules/streaming/live-metrics.service.ts:172` `logHeap()`(60초 간격, `process.memoryUsage()` 기반, warn 레벨) — 컨테이너에 `mem_limit`만 걸고 V8 힙 크기 플래그를 안 주면 V8이 호스트 RAM 기준으로 힙을 잡아 GC가 압박을 못 느끼고, 라이브 방송 피크에 커널이 스택트레이스 없이 프로세스를 SIGKILL한다. 텔레메트리도 `os.totalmem()/freemem()`(호스트 기준)으로 재던 시절엔 "메모리 정상"으로 보여 원인 특정이 수주간 불가능했다.
+- `.github/workflows/deploy-production.yml:113` `golden-flow-gate` 잡 — user+admin 골든플로우 Playwright 스펙이 전부 통과해야만 프로덕션 프로모션이 진행(`:539` `needs: [...golden-flow-gate]`). 아래 교훈 절 "처방"이 실제 CI 하드 게이트로 구현된 사례.
 
 ### 알림 (PG 결제는 없음 — 수동 입금 + 알림톡 방식)
 - `backend/src/modules/notifications/push-notification.service.ts:16` — Web Push(VAPID). `notifications/clients/kakao-talk.client.ts` — Kakao 알림톡(Bizgo). `NotificationTemplate`:451 — DB 템플릿.
 - 주문은 `BANK_TRANSFER`/`PENDING`으로 생성, 판매자 입금확인 후 CONFIRMED(`depositorName` 매칭). PG API 연동 없음.
 
-## 교훈 — 채팅 두더지잡기 포렌식 (2026-07-06, git 3,597커밋 + 코드 분석)
+## 교훈 — 채팅 두더지잡기 포렌식 (2026-07-06, git 3,597커밋 + 코드 분석; 2026-07-07 갱신: 처방 이행 확인)
 
 채팅/소켓 fix 커밋 154+건, 최악 구간은 이틀 18 fix(04-26~27). 이름 붙인 실패 패턴 5개:
 1. **삼중 소켓 진입점** — `main.ts` 수동 /chat 핸들러 + websocket.gateway + chat.gateway 공존. ChatGateway 리팩토링→revert→제거(`969dee42`→`12649ce3`→`2c2cc97e`).
@@ -35,11 +38,18 @@
 4. **재연결 잡음/유령 소켓** — rapid unmount로 중복 소켓·메모리 누수(`4ddc5f3b`, `1fbb2bf9`).
 5. **환경별 전송 미스매치** — ws/wss·namespace·localhost fallback(`74cab857`, `9a3ee03a`, `c80af29e`).
 
-**구조 원인**: 채팅 배관은 격리돼 있으나 (a) 단일 `authenticateSocket`(`backend/src/common/middleware/ws-jwt-auth.middleware.ts:145`)을 전 네임스페이스가 공유, (b) refresh 싱글톤(`client-app/src/lib/api/client.ts:56`)을 HTTP+전 소켓이 공유, (c) 채팅 마운트가 auth store에 종속(`client-app/src/app/live/[streamKey]/page.tsx:192` liveChatEnabled) — 그래서 채팅 fix가 auth를 건드리고 auth fix가 채팅을 터뜨림. **골든플로우 #2는 있으나 스펙이 종이호랑이**: `client-app/e2e/chat-send-message.spec.ts:122` 수신 검증이 hard expect 없이 로그만, 셀렉터가 모바일 placeholder와 불일치해 조용히 스킵. 백엔드 소켓 통합테스트 0개.
+**구조 원인**: 채팅 배관은 격리돼 있으나 (a) 단일 `authenticateSocket`(`backend/src/common/middleware/ws-jwt-auth.middleware.ts:145`)을 전 네임스페이스가 공유, (b) refresh 싱글톤(`client-app/src/lib/api/client.ts:56`)을 HTTP+전 소켓이 공유, (c) 채팅 마운트가 auth store에 종속(`client-app/src/app/live/[streamKey]/page.tsx:192` liveChatEnabled) — 그래서 채팅 fix가 auth를 건드리고 auth fix가 채팅을 터뜨린다.
 
-**처방**(dorami AGENTS.md 골든플로우 절에 반영): 정책 불변식 명문화, 공유 레이어 4파일 수정 시 동반 스모크 의무, 스펙에 hard assert. 상세 함정 목록 → [[실시간-스트리밍-소켓아키텍처]].
+**처방 이행 확인 (2026-07-06 커밋 `8bf2413f`, 포렌식 당일 같은 날 반영):**
+- 골든플로우 #2(`client-app/e2e/chat-send-message.spec.ts:117-127`) — A-CHT-02(발신자 즉시표시)/A-CHT-05(수신자 실시간 전파)가 이제 하드 `expect().toBeVisible()`. 셀렉터도 데스크톱(`메시지 입력...`)+모바일(`메시지를 입력하세요...`) placeholder를 `:visible` union으로 매칭해 모바일 레이아웃에서 조용히 스킵되던 문제가 해결됨. **"스펙이 종이호랑이"였던 이전 상태는 더 이상 사실이 아니다.**
+- 신규 스펙 `client-app/e2e/chat-token-expiry-reconnect.spec.ts` — 실패 패턴 3(토큰 만료 재연결) 회귀를 전담 가드. accessToken 쿠키만 만료시키고 소켓 재연결을 강제한 뒤 `POST /api/auth/refresh` 성공 + accessToken 재발급을 hard-assert.
+- CI 배포 게이트(`.github/workflows/deploy-production.yml:113` `golden-flow-gate`)가 프로덕션 프로모션을 골든플로우 e2e 통과에 하드 종속(`:539`) — "실패할 수 없는 스펙"이 게이트 역할을 못 하던 문제가 인프라 레벨에서도 봉쇄됨.
+- 프로젝트 자체 `AGENTS.md`에 "Chat Regression Contract"로 불변식(정책은 재논의 금지, 공유 레이어 4파일 수정 시 골든플로우 #1/#2/#6 동반 검증, 단일 소켓 진입점 유지)이 명문화됨.
+
+**남은 리스크**: 백엔드 소켓 통합테스트는 여전히 0개(검증은 E2E 레이어에서만 이뤄짐).
 
 ## 미확인 (추가 조사 필요)
-- Settlement 커미션 계산/레코드 생성 위치(현 서비스는 조회/엑셀만). ChatMessage DB 영속화 경로(소켓은 Redis만).
+- Settlement 커미션 계산/레코드 생성 위치 — 여전히 미확인. `prisma.settlement.create()` 호출이 코드베이스 전체에 0건(grep 확인); `settlement.service.ts`는 조회·엑셀 리포트만 구현. `Settlement.commission` 컬럼(schema.prisma:551)은 존재하지만 채우는 코드가 없다.
+- ChatMessage DB 영속화 경로 — 여전히 소켓은 Redis만 사용(`main.ts` `/chat` 핸들러가 `chat:{liveId}:history`에만 씀). 다만 `ChatMessage` 테이블 자체는 schema.prisma:135에 존재하고, `admin.service.ts:1285,1291`이 최근 7일 카운트 쿼리 대상으로 읽는다 — 즉 어드민 대시보드가 항상 0을 반환하는 죽은 지표를 노출 중일 가능성.
 
-## 의존 개념: [[원자적-조건부-감소]] · [[실시간-스트리밍-소켓아키텍처]] · [[웹앱-인증-세션-계층]] · [[정산-포인트-원장]] · [[멀티에이전트-역할오케스트레이션]]
+## 의존 개념: [[원자적-조건부-감소]] · [[실시간-스트리밍-소켓아키텍처]] · [[웹앱-인증-세션-계층]] · [[정산-포인트-원장]] · [[멀티에이전트-역할오케스트레이션]] · [[요청-코얼레싱-인플라이트]]

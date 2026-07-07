@@ -1,0 +1,14 @@
+# lint 자동 실행 (주간 스케줄) — 2026-07-07 13:18
+
+pages: 70 (concepts 25, projects 31)
+
+DEAD LINKS: 0
+
+ORPHANS (no inbound links): 0
+
+FILE:LINE refs checked: 96, stale: 0
+
+log.md issues: 0
+
+README counts: 개념 25/25, 프로젝트 31/31 -> OK
+
