@@ -4,7 +4,7 @@
 
 ## 핵심 자산 (다른 곳에서 주워올 것)
 ### 동시성 (dorami 최고 자산)
-- `backend/src/modules/orders/inventory.service.ts:104` — 재고 원자적 조건부 감소 (canonical). → [[원자적-조건부-감소]]
+- `backend/src/modules/orders/inventory.service.ts:34` `batchConfirmDecreaseStockTx` — 재고 감소 (canonical, 2026-07-07 재설계). **패턴이 바뀌었다**: 예전 `WHERE stock >= qty` 조건부 감소(주문 *생성* 시점, 부족하면 throw)를 삭제하고, **결제 *확정* 시점에 FOR UPDATE 비관적 락 + `Math.max(0, …)` clamp**(oversell 허용, throw 안 함)로 전환(`a0c7b0de feat(orders): decrement stock at payment confirmation, not order creation`). 미결제 PENDING_PAYMENT 주문은 재고를 잡지 않고, 물리 재고는 admin 입금확인 때만 감소. 락은 `sortedItems`(`:41`)로 정렬 후 `SELECT … FOR UPDATE`(product `:55`, variant `:64`)를 **선취득**해 다건 주문 동시 확정 데드락을 방지(IN 리스트는 `Prisma.join` 파라미터 바인딩 → injection-safe). 감소 자체는 clamp된 절대값 set(product `:116`/`:119`, variant `:83`/`:86`). 호출부는 결제확정 플로우 `backend/src/modules/admin/admin.service.ts:1963`(같은 Serializable 트랜잭션에서 `PENDING_PAYMENT→PAYMENT_CONFIRMED` 가드된 flip 직후 1회 감소), 되돌리기는 `batchRestoreStockTx`(`inventory.service.ts:143`). DB 레벨 belt-and-braces로 non-negative CHECK 제약(`backend/prisma/migrations/20260707120000_add_stock_non_negative_check/migration.sql:10`)까지 이중화. Golden Flow #8(Admin 주문관리/입금확인)에 직결. → [[원자적-조건부-감소]]
 - `backend/src/modules/points/points.service.ts:192` `deductPointsTx` — 포인트 원자적 차감(동일 패턴). → [[원자적-조건부-감소]]
 - `backend/src/modules/orders/orders.service.ts:210` — 다건 락 순서 정렬 데드락 방지(`withOrderTransactionRetry`로 감싸는 재시도 트랜잭션, `:102`).
 - `backend/src/modules/reservation/reservation.service.ts:207` — 예약 대기열 WAITING→PROMOTED 승격 + 만료 크론(`:256`).
@@ -52,6 +52,14 @@
 - 프로젝트 자체 `AGENTS.md`에 "Chat Regression Contract"로 불변식(정책은 재논의 금지, 공유 레이어 4파일 수정 시 골든플로우 #1/#2/#6 동반 검증, 단일 소켓 진입점 유지)이 명문화됨.
 
 **남은 리스크**: 백엔드 소켓 통합테스트는 여전히 0개(검증은 E2E 레이어에서만 이뤄짐).
+
+## 교훈 — raw SQL 테이블명 드리프트 (2026-07-07, 재고 감소 재설계 중 2회 발생)
+
+이름 붙인 실패 패턴: **Prisma 모델명(`"Product"`/`"ProductVariant"`)을 `$queryRaw`·원시 마이그레이션에 그대로 써서, 실제 `@@map` snake_case 테이블(`products`/`product_variants`)을 못 찾아 런타임 `42P01 relation does not exist`(500)로 터진다.** Prisma Client 고수준 API는 매핑을 해주지만 raw SQL은 안 해준다. 같은 결함이 두 곳에서 각각 발생:
+- 마이그레이션(`41a0dfcf`) — CHECK 제약 대상 테이블명이 모델명이라 CI `prisma migrate deploy`가 42P01로 실패(배포 게이트가 정상 차단 → staging 미적용).
+- 런타임 FOR UPDATE 락(`e5e685b1`) — `inventory.service.ts:55`/`:64`의 두 `$queryRaw`가 `FROM "Product"`/`FROM "ProductVariant"`였음. 실 DB에서 결제확정이 500으로 throw. **모킹된 유닛 테스트는 못 잡는다**(`tx.$queryRaw`가 stub이라 SQL 문자열 미검증) → staging 실DB API 검증에서만 발견.
+
+처방: Prisma raw SQL/마이그레이션의 테이블명은 모델명이 아니라 `@@map` 실테이블명을 쓴다. 이 클래스는 모킹 유닛테스트 사각지대 → 실DB 통합/스테이징 검증 필수. (단일 프로젝트 관측이라 concept 미승격, 재고 감소 재설계 자산의 부속 교훈으로 기록. mt5/StockDante 등에서 재관측 시 concept 후보.)
 
 ## 미확인 (추가 조사 필요)
 - Settlement 커미션 계산/레코드 생성 위치 — 여전히 미확인. `prisma.settlement.create()` 호출이 코드베이스 전체에 0건(grep 확인); `settlement.service.ts`는 조회·엑셀 리포트만 구현. `Settlement.commission` 컬럼(schema.prisma:551)은 존재하지만 채우는 코드가 없다.

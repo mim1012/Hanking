@@ -2,7 +2,7 @@
 
 > Karpathy LLM Wiki 패턴 구현. "이 기능 어디서 주워와?"에 즉시 답하는 재사용 색인.
 > Obsidian으로 이 폴더(`D:\Project\_wiki`)를 볼트로 열면 그래프 뷰 + `[[링크]]` 그대로 동작.
-> 현재: 개념 26 · 프로젝트 31 (죽은 링크 0).
+> 현재: 개념 27 · 프로젝트 32 (죽은 링크 0).
 
 ## 🗺️ 도메인별 지도 (여기서 시작)
 - [[네이버-트래픽-커머스]] · [[트레이딩]] · [[앱-자동화-리버싱]] · [[웹앱-SaaS]] · [[소셜-수집]] · [[에이전트-인프라]]
@@ -29,7 +29,7 @@
 ### 웹앱/SaaS · 라이브 커머스
 - [[웹앱-인증-세션-계층]] · [[멀티테넌트-요청파이프라인]] · [[정산-포인트-원장]]
 - [[원자적-조건부-감소]] · [[실시간-스트리밍-소켓아키텍처]]
-- [[서버리스-공유-레이트리밋]] · [[요청-코얼레싱-인플라이트]] · [[레거시-코드체계-호환-필터]] · [[실시간-토큰리프레시-락-먼저-비교]]
+- [[서버리스-공유-레이트리밋]] · [[요청-코얼레싱-인플라이트]] · [[레거시-코드체계-호환-필터]] · [[실시간-토큰리프레시-락-먼저-비교]] · [[PostgREST-1000행캡-회피]]
 
 ### 에이전트 인프라
 - [[멀티에이전트-역할오케스트레이션]] · [[파일기반-지속메모리]] · [[하네스-플러그인-흡수-vs-설치]]
@@ -45,7 +45,7 @@
 ### 앱 자동화/리버싱
 - [[project-Vortex]] · [[project-UberAutoAccept]] · [[project-guardian-decompile]]
 ### 웹앱/SaaS
-- [[project-massage]] · [[project-medical-ERP]] · [[project-wishcat]]
+- [[project-massage]] · [[project-medical-ERP]] · [[project-wishcat]] · [[project-BAGJO1]]
 ### 에이전트 인프라
 - [[project-warm-agent]] · [[project-hermes-agent]] · [[project-oh-my-codex]] · [[project-Decepticon]]
 
@@ -59,7 +59,7 @@
 7. **파일 기반 메모리** — warm-agent/hermes/.omc/claude-forge/Decepticon → 공통 메모리 계층
 
 ## 빈/소스없음 (스캔 확인, 자산 없음)
-- `PJT v4.6` 2폴더(nul만) · `YKP ERP System` · `ykp-dashboard` · `soomgo` · `n8n project`(문서만) · `korean-law`(법률문서) · `1.BlogCrawlTransfer2`(컴파일 바이너리)
+- `PJT v4.6` 2폴더(nul만) · `YKP ERP System` · `ykp-dashboard` · `soomgo` · `n8n project`(문서만) · `korean-law`(법률문서) · `1.BlogCrawlTransfer2`(컴파일 바이너리) · `BAGJO`(`.git`만, 소스 없음)
 
 ## raw (원본 소스)
 - `raw/` — 프로젝트 폴더는 `D:\Project\*` 절대경로로 참조(복제 안 함)
