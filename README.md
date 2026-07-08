@@ -2,7 +2,7 @@
 
 > Karpathy LLM Wiki 패턴 구현. "이 기능 어디서 주워와?"에 즉시 답하는 재사용 색인.
 > Obsidian으로 이 폴더(`D:\Project\_wiki`)를 볼트로 열면 그래프 뷰 + `[[링크]]` 그대로 동작.
-> 현재: 개념 27 · 프로젝트 32 (죽은 링크 0).
+> 현재: 개념 28 · 프로젝트 38 (죽은 링크 0).
 
 ## 🗺️ 도메인별 지도 (여기서 시작)
 - [[네이버-트래픽-커머스]] · [[트레이딩]] · [[앱-자동화-리버싱]] · [[웹앱-SaaS]] · [[소셜-수집]] · [[에이전트-인프라]]
@@ -18,7 +18,7 @@
 ## 개념 (재사용 기법) — concepts/
 ### 트래픽/수집 자동화
 - [[봇탐지-우회-스택]] · [[사람행동-시뮬레이션]] · [[IP-로테이션]] · [[캡차-차단-대응]] · [[TLS-임퍼소네이션-WAF우회]]
-- [[네이버-순위-계산]] · [[네이버-공식API-서명]] · [[브라우저-세션쿠키-영속화]]
+- [[네이버-순위-계산]] · [[네이버-공식API-서명]] · [[브라우저-세션쿠키-영속화]] · [[앱-자동업데이트-채널]]
 
 ### 앱 자동화/리버싱
 - [[Shizuku-입력주입]] · [[디컴파일-ViewId-자동화]] · [[State-Machine-접근성서비스]]
@@ -37,15 +37,15 @@
 ## 프로젝트 — projects/
 ### 네이버/커머스 트래픽·순위
 - [[project-adpang-production]] · [[project-electrone_navershopping]] · [[project-sellermate_naver_place_all]]
-- [[project-turafic]] · [[project-naver-traffic-android-samsung]] · [[project-naver_turafic_samsung]]
+- [[project-turafic]] · [[project-naver-traffic-android-samsung]] · [[project-naver_turafic_samsung]] · [[project-turafic_update]]
 ### 커머스/수집/소셜
-- [[project-dorami]] · [[project-band-sourcing]] · [[project-insta]]
+- [[project-dorami]] · [[project-band-sourcing]] · [[project-insta]] · [[project-kmong]]
 ### 트레이딩
-- [[project-SOLX]] · [[project-StockDante]] · [[project-mt5]] · [[project-PJT-v4.7-KIS자동매매]]
+- [[project-SOLX]] · [[project-StockDante]] · [[project-mt5]] · [[project-PJT-v4.7-KIS자동매매]] · [[project-Crypto]]
 ### 앱 자동화/리버싱
-- [[project-Vortex]] · [[project-UberAutoAccept]] · [[project-guardian-decompile]]
+- [[project-Vortex]] · [[project-UberAutoAccept]] · [[project-guardian-decompile]] · [[project-Media_enhanced-v1.0]] · [[project-turbo]]
 ### 웹앱/SaaS
-- [[project-massage]] · [[project-medical-ERP]] · [[project-wishcat]] · [[project-BAGJO1]]
+- [[project-massage]] · [[project-medical-ERP]] · [[project-wishcat]] · [[project-BAGJO1]] · [[project-tableflow]]
 ### 에이전트 인프라
 - [[project-warm-agent]] · [[project-hermes-agent]] · [[project-oh-my-codex]] · [[project-Decepticon]]
 
@@ -59,7 +59,9 @@
 7. **파일 기반 메모리** — warm-agent/hermes/.omc/claude-forge/Decepticon → 공통 메모리 계층
 
 ## 빈/소스없음 (스캔 확인, 자산 없음)
-- `PJT v4.6` 2폴더(nul만) · `YKP ERP System` · `ykp-dashboard` · `soomgo` · `n8n project`(문서만) · `korean-law`(법률문서) · `1.BlogCrawlTransfer2`(컴파일 바이너리) · `BAGJO`(`.git`만, 소스 없음)
+- `PJT v4.6` 2폴더(nul만) · `YKP ERP System` · `ykp-dashboard` · `soomgo` · `n8n project`(문서만) · `korean-law`(법률문서) · `1.BlogCrawlTransfer2`(컴파일 바이너리) · `BAGJO`(`.git`만, 소스 없음) · `gajae-code-global`(+wsl: 설치된 gajae-code CLI 툴 홈, 원본소스 없음)
+
+> 최근 스캔에서 **등록 프로젝트의 클론/워크트리로 확인돼 스킵**: `adpang-landing-page`·`adpang-ui-design-sandbox`·`adpang-production-security-quality`(→adpang), `massage-deploy`(→massage), `dorami-pr97-api-burst`·`dorami-pr98-clean`(→dorami), `vortex_rooting`(→Vortex 루팅 브랜치, project-Vortex 노트로 흡수). `MediaEnhanced`는 `Media_enhanced-v1.0`의 얕은 복제.
 
 ## raw (원본 소스)
 - `raw/` — 프로젝트 폴더는 `D:\Project\*` 절대경로로 참조(복제 안 함)
