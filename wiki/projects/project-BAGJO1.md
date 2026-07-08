@@ -9,10 +9,11 @@
 - **크로스탭 이벤트 동기 장바구니** — `src/lib/cart.ts:25` — 모든 변경 후 `window.dispatchEvent(new Event('cart-updated'))`로 헤더 배지 라이브 갱신. 옵션 병합 + 5만원 이상 무료배송 계산.
 - **설정주도 관리자 CRUD 테이블 `AdminResourcePage`** — `src/components/admin/AdminResourcePage.tsx` — `columns`/`rows`/`filters`/`createFields` 스펙 하나로 임의의 admin 목록 화면(검색·필터칩·스탯타일·상태배지·생성 드로어·빈상태) 렌더. 빠른 admin 콘솔에 재사용.
 - **수주 골든플로우 배포게이트 스캐폴드** — `AGENTS.md` §7 골든플로우 7종 표 + `tests/golden/*.spec.ts`(현재 `test.fixme()` 스텁) + `.github/workflows/ci.yml` typecheck+build+lint 게이트. 사용자의 massage 환불 사고 계기 contract-project-gates 규칙을 그대로 구현한 복제용 스캐폴드.
+- **카카오·네이버 소셜 로그인 (키게이트·Auth.js v5)** — `src/lib/auth.ts:7`(NextAuth zero-config·JWT) + `src/lib/socialAuth.ts:22`(브릿지: 세션→기존 User 합류, `:44` admin 승격 차단, `:55` 이메일 미제공 플레이스홀더) + `src/app/auth/complete/page.tsx:11`. 상세는 [[카카오-네이버-소셜로그인-AuthJS]] (canonical이 이 프로젝트). 사업주 계정 정책·앱 등록 절차: `docs/social-login-setup.md`.
 
 ## 주의점 / 함정
 - **잠재 drift 버그** — `src/types/index.ts`의 `InsuranceApplication`이 canonical(`name`/`breed`)과 레거시형(`ownerName?`/`petBreed?`) 필드를 동시에 들고 있고, admin 화면(`src/app/admin/insurance/page.tsx:45`)은 레거시 필드를 읽는다 → 폼이 `name`으로 쓰면 admin이 못 읽는 사일런트 shape drift 위험. [[레거시-코드체계-호환-필터]]가 경고하는 패턴.
 - 골든플로우 Playwright 스펙 7종이 전부 `test.fixme()` 스텁이고 root `playwright.config.ts` 부재 → 게이트가 아직 실효 없음(화면 완성 시 활성화 예정).
-- 데이터는 전부 mock + localStorage. `src/app/api/**`는 "생성 예정". 백엔드 자산 없음.
+- 데이터는 전부 mock + localStorage. 첫 API 라우트는 소셜 로그인 `src/app/api/auth/[...nextauth]/route.ts:1`뿐(2026-07-08) — 그 외 백엔드 자산 없음.
 
-## 의존 개념: [[웹앱-인증-세션-계층]] (localStorage 세션+role RBAC, `storage.ts:133`~) · [[레거시-코드체계-호환-필터]]
+## 의존 개념: [[웹앱-인증-세션-계층]] (localStorage 세션+role RBAC, `storage.ts:133`~) · [[레거시-코드체계-호환-필터]] · [[카카오-네이버-소셜로그인-AuthJS]]
