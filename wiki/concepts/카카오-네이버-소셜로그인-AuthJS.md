@@ -14,7 +14,8 @@
 - `BAGJO1/src/lib/socialAuth.ts:44,62` — **admin 승격 차단**: 소셜 경로는 매칭/신규 모두 `role: 'user'` 강제.
 - `BAGJO1/src/lib/socialAuth.ts:55` — 이메일 미제공(카카오 비즈앱 검수 전) 시 `social-<provider>-<ts>@placeholder.baekjo` 고유 플레이스홀더로 이메일 기준 중복제거 오병합 방지.
 - `BAGJO1/src/app/auth/complete/page.tsx:11` — 브릿지 페이지: `useRef`로 StrictMode 이중실행 가드, setState 없이 redirect만(hydration lint 회피).
-- 검증 상태: CI(tsc+build+lint) green + 프로덕션 카나리(/login 200·렌더) 확인. **OAuth 왕복은 키 발급 후 검증 예정** — Redirect URI 형식은 `/api/auth/callback/{kakao,naver}`.
+- 검증 상태: **OAuth 왕복 실계정 검증 완료(2026-07-09)** — localhost에서 카카오·네이버 모두 로그인→동의→콜백→세션 합류→마이페이지 반영 통과. 프로덕션(PR #2 머지 후)도 Vercel env 6종 + 콘솔 redirect 등록 후 서버 카나리(providers 응답·signin 302→kauth/nid) 통과. Redirect URI 형식은 `/api/auth/callback/{kakao,naver}`.
+- UX 마감(PR #2): 공식 브랜드 버튼(`BAGJO1/src/components/common/SocialLoginButtons.tsx:1` — #FEE500/#03C75A+심볼, 네이버 검수 요건), 실패 시 `/login?error=` 복귀+배너, 클릭 잠금(중복 PKCE 방지), `auth.ts`에 `pages.error='/login'`.
 
 ## 주의점 / 함정
 - **「소셜 이메일 매칭 admin 승격」** — OAuth가 돌려준 이메일(제공자 검증 여부 불명)을 기존 회원과 매칭해 레코드 전체(role 포함)를 상속하면, admin 이메일로 만든 소셜 계정이 관리자가 된다. security-reviewer가 CRITICAL로 검출 → role 강제 'user'로 차단(`socialAuth.ts:44`). 실DB 붙일 때도 이 규칙을 승계할 것.
