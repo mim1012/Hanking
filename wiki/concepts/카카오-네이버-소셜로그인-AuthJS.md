@@ -28,4 +28,4 @@
 - **OAuth 수제 구현(라우트 핸들러 직접 작성)** — next-auth의 Next 16 지원이 불확실하다는 가정에서 검토했으나, beta.31 peerDeps 확인으로 배제. CSRF/state 처리를 공짜로 얻는 쪽이 우위.
 - **storage.ts에 next-auth 정적 import** — 세션 파사드(storage.ts)를 쓰는 모든 화면이 next-auth에 정적 의존하게 됨 → `logout()` 내부에서 동적 `import('next-auth/react')` fire-and-forget으로 회피 (`BAGJO1/src/lib/storage.ts:183`).
 
-## 관련: [[웹앱-인증-세션-계층]] · [[project-BAGJO1]]
+## 관련: [[웹앱-인증-세션-계층]] · [[서버리스-응답후작업-after]] · [[project-BAGJO1]]

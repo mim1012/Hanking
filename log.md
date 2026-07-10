@@ -39,3 +39,4 @@
 ## 2026-07-10 — BAGJO1 베타 회원 시스템 반영
 - [[카카오-네이버-소셜로그인-AuthJS]] 정본 현행화: 소셜 매칭/등록이 클라이언트(socialAuth.ts) → 서버 jwt 콜백 upsert(auth.ts:54)로 이관, admin 차단 불변식 위치 갱신(auth.ts:63), 플레이스홀더 이메일 provider-id 기반으로 교체(repo.ts:184) — 로그인마다 신규 레코드 생기던 Phase 1 한계 해소 기록.
 - 근거: BAGJO1 PR #3 (Supabase members 테이블 + Credentials 로그인 + proxy 가드), 운영 문서 BAGJO1/docs/beta-members-setup.md.
+- 2026-07-10 | Compile | 신규 concept [[서버리스-응답후작업-after]] — Vercel 응답후 fire-and-forget 유실→after() (BAGJO1 PR#6 프로덕션 검증). 소셜로그인 페이지 상호링크, README 개념 29→30
