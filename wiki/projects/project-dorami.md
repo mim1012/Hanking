@@ -61,6 +61,17 @@
 
 처방: Prisma raw SQL/마이그레이션의 테이블명은 모델명이 아니라 `@@map` 실테이블명을 쓴다. 이 클래스는 모킹 유닛테스트 사각지대 → 실DB 통합/스테이징 검증 필수. (단일 프로젝트 관측이라 concept 미승격, 재고 감소 재설계 자산의 부속 교훈으로 기록. mt5/StockDante 등에서 재관측 시 concept 후보.)
 
+## 교훈 — 라이브 뷰어 종료화면 오표시 + wedge-recovery 리마운트 폭주 (2026-07-11, grok 리뷰 발단 → Opus 교차검증)
+
+발단: xAI **grok CLI** 코드리뷰가 라이브 스트리밍 FSM 픽스 커밋(`6c3be42d`·`48c18bdf`)에서 HIGH 2건을 지목 → Opus가 파일 직접 교차검증으로 확정. 이름 붙인 실패 패턴 2개:
+
+1. **LIVE→OFFLINE 렌더 혼동 (종료된 방송이 "곧 시작"으로 표시)** — 뷰어 페이지 `client-app/src/app/live/[streamKey]/page.tsx`의 최상단 렌더 가드 `if (streamStatus.status !== 'LIVE')`가 **"방송 시작 전(PENDING)"과 "방송 종료(LIVE→OFFLINE)"를 같은 status로 뭉쳐** 종료 방송에 "아직 방송 전이에요 / 곧 시작됩니다"를 렌더. FSM엔 이미 올바른 종료 오버레이("방송이 종료되었습니다", `useLiveLayoutMachine.ts` `computeLayout` ENDED 케이스)가 있었지만 **status 기반 early-return이 먼저 실행돼 도달 불가능한 죽은 코드**였음. 폰을 잠깐 잠갔다 복귀한 시청자가 종료 방송을 "곧 시작"으로 오인해 이탈. 일반 10초 grace 종료 경로에도 동일 적용된 **선재 버그**(skip-grace 커밋이 만든 게 아니라 더 빨리 도달하게 했을 뿐). 처방: `deriveOfflineScreen(snapshot)`(`useLiveLayoutMachine.ts:168`) — 스냅샷 ENDED면 종료화면, 아니면 대기화면. 소비처 `page.tsx:882`.
+2. **wedge-recovery 리마운트 폭주** — 백엔드가 unpublish grace 동안 DB를 LIVE로 지연 유지하는 사이 스트림이 실제 종료되면, 새로 마운트된 VideoPlayer가 다시 `STREAM_ENDED`를 쏨 → 가속 5초 폴(`snapshot==='ENDED'`)이 매번 `playerSessionSeed`를 증가시켜 **DB가 OFFLINE 될 때까지 5초마다 플레이어 리마운트 난타**. 원 커밋의 *"MEDIA_ERROR는 RETRYING으로 매핑되니 루프 안전(Opus APPROVE)"* 논리는 **에러 경로만 막을 뿐 깨끗하게 끝난 스트림의 STREAM_ENDED 재진입은 못 막는 사각**이 있었음(grok이 지적). 처방: `shouldRecoverWedge(now, lastRecoveredAt, 30s)`(`useLiveLayoutMachine.ts:154`, 상수 `:152`)로 쿨다운 — 진짜 일시 wedge는 첫 폴 즉시 1회 복구, 재진입은 억제해 진실된 ENDED("방송이 종료되었습니다") 유지. 게이트 `page.tsx:696`, ref `:177`.
+
+**검증**: 순수함수 유닛 회귀 7건(`client-app/src/hooks/__tests__/useLiveLayoutMachine.test.ts:232` shouldRecoverWedge, `:264` deriveOfflineScreen — 37/37 green) + E2E `client-app/e2e/live-ended-screen.spec.ts`(status를 route-mock으로 LIVE→OFFLINE 전이시켜 "방송이 종료되었어요" 표시 & "곧 시작됩니다" 부재를 hard-assert). **골든 #1 `live-page.spec.ts`가 `/live` 목록 페이지만 보고 `[streamKey]` 뷰어 페이지의 종료상태를 안 봤던 사각을 메움** — massage 환불 교훈([[레거시-코드체계-호환-필터]])의 "클라가 쓰는 실제 화면을 아무도 안 열어봤다"와 동형.
+
+**메타 교훈**: 순수함수 유닛테스트는 결정 로직만 잠근다. `page.tsx`가 그 함수를 호출해 올바른 문구를 렌더하는 **JSX 배선은 유닛 사각** → 뷰어 화면 종료상태는 반드시 E2E(route-mock)로 가드. 크로스모델 리뷰(grok가 지목 → Opus가 파일 열어 근본원인 확정)가 단일 모델 자기검토보다 사각을 잘 잡은 사례.
+
 ## 미확인 (추가 조사 필요)
 - Settlement 커미션 계산/레코드 생성 위치 — 여전히 미확인. `prisma.settlement.create()` 호출이 코드베이스 전체에 0건(grep 확인); `settlement.service.ts`는 조회·엑셀 리포트만 구현. `Settlement.commission` 컬럼(schema.prisma:551)은 존재하지만 채우는 코드가 없다.
 - ChatMessage DB 영속화 경로 — 여전히 소켓은 Redis만 사용(`main.ts` `/chat` 핸들러가 `chat:{liveId}:history`에만 씀). 다만 `ChatMessage` 테이블 자체는 schema.prisma:135에 존재하고, `admin.service.ts:1285,1291`이 최근 7일 카운트 쿼리 대상으로 읽는다 — 즉 어드민 대시보드가 항상 0을 반환하는 죽은 지표를 노출 중일 가능성.
