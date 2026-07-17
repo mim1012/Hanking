@@ -13,6 +13,7 @@
 - **크로스탭 이벤트 동기 장바구니** — `src/lib/cart.ts:25` — 변경 후 `window.dispatchEvent(new Event('cart-updated'))`로 헤더 배지 라이브 갱신.
 - **수주 골든플로우 배포게이트 (실가동)** — AGENTS.md §7 골든플로우 7종 + CI `verify`(typecheck+build+lint) required check + **시각 회귀 게이트**(`tests/golden/visual.spec.ts`, 7경로×2뷰포트=14장, Vercel Preview 대상 픽셀 비교, 베이스라인은 CI Linux 전용) — 상세 [[시각-회귀-베이스라인-게이트]]. contract-project-gates 규칙의 실동작 구현체.
 - **카카오·네이버 소셜 로그인 (Auth.js v5)** — canonical은 [[카카오-네이버-소셜로그인-AuthJS]] (이 프로젝트). 서버 jwt 콜백 upsert로 멤버 합류, admin 승격 차단.
+- **결제상태 writer 이원화 (2026-07-18 하드닝 웨이브, PR #125~#129)** — [[원자적-조건부-감소]] 강화 사례. `payment_status`를 쓸 수 있는 코드를 CAS 함수(`updatePaymentStatusGuarded`, WHERE payment_status=<from>, 0행→409)와 취소 RPC(`supabase/migrations/0031_cancel_restores_bank_transfer.sql:33` — WHERE로 멱등) **둘로만** 좁히고, 범용 update 함수는 타입 레벨(Omit)로 payment_status를 못 받게 함 — "조건 없는 상태 쓰기 금지"를 리뷰 약속이 아니라 컴파일 강제로. 수동 전이는 화이트리스트(입금대기→결제완료, 결제완료→환불완료)만. 같은 웨이브: 옵션가 서버 파생(#125)·구매확정 confirmed_at IS NULL CAS(#127)·무통장 72h TTL+rate limit(#129).
 
 ## 주의점 / 함정
 - **정적 seed 정본 사고 (2026-07-17 — [[목데이터-수명-단일정본]]의 발원지)** — UI mock였던 `src/data/{products,brands}.ts`가 "재시드 정본"으로 승격돼 같은 값이 파일·시드 SQL·라이브 DB 세 곳에 손으로 적혔고, 불일치 수습 마이그레이션 0014~0018 + 프로덕션→파일 **역기입**(0035 정리 국면)까지 발생. 파일 삭제 + `/admin` 단일 입력구 + `supabase/migrations/`를 복구 정본으로 확정하며 종결.
@@ -20,6 +21,7 @@
 - **마이그레이션 번호 함정** — `0005`·`0032` 결번, `0004b` letter suffix, **`0034` 2개**(catcode·shipments 번호 충돌), `0041`도 2개(concerns·shipments_confirm). 새 번호 딸 때 파일명 나열 확인 필수.
 - **InsuranceApplication 이중 필드(canonical `name`/`breed` + 레거시 `ownerName?`/`petBreed?`, `src/types/index.ts:188`·`:196`)** — 과거 "잠재 drift 버그"로 기록했으나 현재는 폼(`src/app/insurance/apply/page.tsx:65`·`:78`)이 레거시 필드를 채워 쓰고 repo(`src/lib/insurance/repo.ts:81`·`:89`)가 왕복 매핑해 **봉합 상태**. 단 이중 필드 자체는 존치라 새 쓰기 경로가 레거시 필드를 빼먹으면 admin 화면(ownerName 읽음)이 다시 깨진다 — [[레거시-코드체계-호환-필터]] 패턴.
 - **Supabase RLS 무력** — 클라이언트가 `src/lib/supabase/server.ts` 하나뿐이고 service-role 키 사용. API 라우트 가드(`requireAdmin`)가 유일한 방어선 — 새 라우트에 가드 누락 = 금고 개방(AGENTS.md §10-3).
+- **머지된 PR 브랜치 push = 고아 (2026-07-18, #126→#130)** — auto-merge/CI watch가 PR을 머지한 직후 워커가 같은 브랜치에 후속 커밋을 push하면 main에도 PR에도 반영 안 되는 고아가 된다. 구제: main에서 새 브랜치 → 고아 SHA cherry-pick(squash 내용이 main에 있으면 클린 적용) → 새 PR. 예방: 머지 감시와 픽스 라운드를 같은 PR에 동시 운용 금지.
 - **Playwright 기본 타깃이 로컬이 아니라 라이브 Vercel 프리뷰**(`playwright.config.ts` baseURL 폴백) — 무심코 돌리면 로컬 코드가 아니라 배포본을 검증. `E2E_BASE_URL=http://localhost:3000` 명시 시에만 dev 서버 자동 기동.
 
 ## 의존 개념: [[웹앱-인증-세션-계층]] · [[레거시-코드체계-호환-필터]] · [[카카오-네이버-소셜로그인-AuthJS]] · [[서버리스-응답후작업-after]] · [[시각-회귀-베이스라인-게이트]] · [[원자적-조건부-감소]] · [[목데이터-수명-단일정본]] · [[반응형-오프캔버스-모바일]]
