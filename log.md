@@ -50,3 +50,4 @@
 - 2026-07-18 | 배선 | 세션마감 위키 등재 게이트 훅 신설 — `D:\.claude\hooks\wiki-close-gate.py`(UserPromptSubmit, 키워드 "세션 마감"/"세션마감"/"session close"/"마감 정리") + settings.json 등록. 마감 절차에 "등재 후보 평가→있으면 미니 Compile / 없으면 마감 보고에 사유 명기" 판단을 강제(등록 자체는 비자동 — 앵커 검증·승격 게이트는 모델 수행). 합성 페이로드 5종(발동3·무음1·fail-open1) 검증. 배경: touch-tracker 리마인더만으론 07-13~17 나흘치 등재 누락
 - 2026-07-18 | Compile | project-BAGJO1 미니컴파일 — 결제상태 writer 이원화(#125~#129 하드닝 웨이브) 자산 + 머지된 PR 고아 push 함정 추가 (세션 마감 게이트)
 - 2026-07-18 | Compile | [[서버리스-공유-레이트리밋]] 함정 추가 — 리미터 도입이 자기 통합스펙을 429로 파괴(BAGJO1 #129→#133 실사례, rateLimit.ts:28·payment-routes.spec.ts:31 검증)
+- 2026-07-18 | Compile | dorami 동기화: 오버셀 admin 표면화(v1.5.10), 카트 죽은-점유 제거+타이머 존중 교훈, 잠자는/조작하는 게이트 교훈 등재 (project-dorami, 원자적-조건부-감소)

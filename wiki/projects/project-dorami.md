@@ -4,7 +4,7 @@
 
 ## 핵심 자산 (다른 곳에서 주워올 것)
 ### 동시성 (dorami 최고 자산)
-- `backend/src/modules/orders/inventory.service.ts:34` `batchConfirmDecreaseStockTx` — 재고 감소 (canonical, 2026-07-07 재설계). **패턴이 바뀌었다**: 예전 `WHERE stock >= qty` 조건부 감소(주문 *생성* 시점, 부족하면 throw)를 삭제하고, **결제 *확정* 시점에 FOR UPDATE 비관적 락 + `Math.max(0, …)` clamp**(oversell 허용, throw 안 함)로 전환(`a0c7b0de feat(orders): decrement stock at payment confirmation, not order creation`). 미결제 PENDING_PAYMENT 주문은 재고를 잡지 않고, 물리 재고는 admin 입금확인 때만 감소. 락은 `sortedItems`(`:41`)로 정렬 후 `SELECT … FOR UPDATE`(product `:55`, variant `:64`)를 **선취득**해 다건 주문 동시 확정 데드락을 방지(IN 리스트는 `Prisma.join` 파라미터 바인딩 → injection-safe). 감소 자체는 clamp된 절대값 set(product `:116`/`:119`, variant `:83`/`:86`). 호출부는 결제확정 플로우 `backend/src/modules/admin/admin.service.ts:1963`(같은 Serializable 트랜잭션에서 `PENDING_PAYMENT→PAYMENT_CONFIRMED` 가드된 flip 직후 1회 감소), 되돌리기는 `batchRestoreStockTx`(`inventory.service.ts:143`). DB 레벨 belt-and-braces로 non-negative CHECK 제약(`backend/prisma/migrations/20260707120000_add_stock_non_negative_check/migration.sql:10`)까지 이중화. Golden Flow #8(Admin 주문관리/입금확인)에 직결. → [[원자적-조건부-감소]]
+- `backend/src/modules/orders/inventory.service.ts:34` `batchConfirmDecreaseStockTx` — 재고 감소 (canonical, 2026-07-07 재설계). **패턴이 바뀌었다**: 예전 `WHERE stock >= qty` 조건부 감소(주문 *생성* 시점, 부족하면 throw)를 삭제하고, **결제 *확정* 시점에 FOR UPDATE 비관적 락 + `Math.max(0, …)` clamp**(oversell 허용, throw 안 함)로 전환(`a0c7b0de feat(orders): decrement stock at payment confirmation, not order creation`). 미결제 PENDING_PAYMENT 주문은 재고를 잡지 않고, 물리 재고는 admin 입금확인 때만 감소. 락은 `sortedItems`(`:41`)로 정렬 후 `SELECT … FOR UPDATE`(product `:55`, variant `:64`)를 **선취득**해 다건 주문 동시 확정 데드락을 방지(IN 리스트는 `Prisma.join` 파라미터 바인딩 → injection-safe). 감소 자체는 clamp된 절대값 set(product/variant 각 경로, variant `:90` `Math.max(0, …)`), **clamp가 조용히 삼키지 않는다(2026-07-18 v1.5.10)**: 부족분 `oversoldBy`(`inventory.service.ts:92`)를 결과에 실어 admin API가 `buildOversoldItems`(`admin.service.ts:265`)로 `data.oversold`에 표면화(단건 `:2063`, 상태변경 `:2257`, 벌크 집계 `:2360` — 벌크는 orderId 태깅)하고, 프론트 admin 주문화면이 경고 배너로 렌더(`client-app/src/app/admin/orders/page.tsx:710`, 상세 `[id]/page.tsx:352`). 호출부는 결제확정 플로우 `backend/src/modules/admin/admin.service.ts:1963`(같은 Serializable 트랜잭션에서 `PENDING_PAYMENT→PAYMENT_CONFIRMED` 가드된 flip 직후 1회 감소), 되돌리기는 `batchRestoreStockTx`(`inventory.service.ts:143`). DB 레벨 belt-and-braces로 non-negative CHECK 제약(`backend/prisma/migrations/20260707120000_add_stock_non_negative_check/migration.sql:10`)까지 이중화. Golden Flow #8(Admin 주문관리/입금확인)에 직결. → [[원자적-조건부-감소]]
 - `backend/src/modules/points/points.service.ts:192` `deductPointsTx` — 포인트 원자적 차감(동일 패턴). → [[원자적-조건부-감소]]
 - `backend/src/modules/orders/orders.service.ts:210` — 다건 락 순서 정렬 데드락 방지(`withOrderTransactionRetry`로 감싸는 재시도 트랜잭션, `:102`).
 - `backend/src/modules/reservation/reservation.service.ts:207` — 예약 대기열 WAITING→PROMOTED 승격 + 만료 크론(`:256`).
@@ -71,6 +71,21 @@
 **검증**: 순수함수 유닛 회귀 7건(`client-app/src/hooks/__tests__/useLiveLayoutMachine.test.ts:232` shouldRecoverWedge, `:264` deriveOfflineScreen — 37/37 green) + E2E `client-app/e2e/live-ended-screen.spec.ts`(status를 route-mock으로 LIVE→OFFLINE 전이시켜 "방송이 종료되었어요" 표시 & "곧 시작됩니다" 부재를 hard-assert). **골든 #1 `live-page.spec.ts`가 `/live` 목록 페이지만 보고 `[streamKey]` 뷰어 페이지의 종료상태를 안 봤던 사각을 메움** — massage 환불 교훈([[레거시-코드체계-호환-필터]])의 "클라가 쓰는 실제 화면을 아무도 안 열어봤다"와 동형.
 
 **메타 교훈**: 순수함수 유닛테스트는 결정 로직만 잠근다. `page.tsx`가 그 함수를 호출해 올바른 문구를 렌더하는 **JSX 배선은 유닛 사각** → 뷰어 화면 종료상태는 반드시 E2E(route-mock)로 가드. 크로스모델 리뷰(grok가 지목 → Opus가 파일 열어 근본원인 확정)가 단일 모델 자기검토보다 사각을 잘 잡은 사례.
+
+## 교훈 — 카트 재고 점유는 죽은 코드였고, 강제 타이머는 설정을 무력화했다 (2026-07-17, 실방송 중 만료 166건 사고)
+
+발단: 실LIVE 방송 중 장바구니가 대량 만료(166건, SQL로 복구). 조사 결과 서로 얽힌 결함 3개:
+1. **죽은 재고 점유** — 결제기준 재고차감 전환(위 재고 재설계, "unpaid orders hold no stock") 이후에도 카트 레벨 재고 예약 코드가 남아 "표시 재고 4 / 가용 0" 모순을 만들었다. 카트는 재고를 잡지 않는다는 새 모델과 모순되는 잔재 → 제거(`9323c7cd`). 현재 계약은 `cart.service.ts:132-139` 주석에 명문화: **타이머는 순수 UX 긴급장치, 재고 의미 없음. 재고는 오직 admin 입금확인에서만 감소.**
+2. **강제 타이머가 셀러 설정 무력화** — 라이브 상품은 `timerEnabled=false`여도 강제로 카운트다운을 걸었음(`280975bb`가 도입) → 방송 중 셀러의 "타이머 끔" 설정이 조용히 무시됨. 처방: `isCartTimerActive`(`cart.service.ts:141`)가 상품의 `timerEnabled`만 존중.
+3. **만료 크론의 필터 기준** — 만료 크론(`cart.service.ts:542` `expireTimedOutCarts`, 매분)은 **상품이 아니라 카트 자신의** `timerEnabled`(`:551`)로 거른다. 상품 설정을 나중에 바꿔도 기존 카트 행에는 소급되지 않으므로, 배포는 새 카트만 고친다 — 기존 카트 180건은 SQL로 별도 무장해제 필요했다.
+
+**이름 붙인 실패 패턴: "죽은 설정(dead config)"** — 관리자 화면의 `default_cart_timer_minutes` 전역 설정은 UI에 존재하지만 만료 로직이 읽지 않는 dead config였다(실제 만료는 상품별 `timer_duration`). 설정 UI가 있다고 배선돼 있다고 믿지 말 것 — 설정값을 읽는 코드까지 추적해야 한다.
+
+## 교훈 — 게이트는 존재가 아니라 실행으로만 게이트다 (2026-07-17)
+
+이름 붙인 실패 패턴 2개:
+1. **잠자는 게이트** — 실LIVE 골든플로우 CI 잡(`.github/workflows/golden-live-chat.yml`)이 만들어진 뒤 **9일간 실행 0건**으로 잠들어 있었다(workflow_dispatch 전용). 그 사이 카트 강제타이머 회귀(위 교훈)는 이 스펙이 잡도록 설계된 바로 그 버그였는데 통과해 배포됨. 스펙의 LIVE 분기가 도달 불가능하면 조용히 degrade하던 bail-out도 `REQUIRE_LIVE=1`에서 하드 실패로 전환. 첫 그린런(2026-07-17)으로 GitHub 러너→staging RTMP egress(tcp/1935) 도달 확인 후 나이트리 스케줄 무장(`:36-37`, cron `30 22 * * *` = KST 07:30). ffmpeg 테스트패턴을 staging SRS에 RTMP publish→`on_publish`로 진짜 LIVE를 세워 사람 인코더 없이 A-CHT-05(채팅 왕복)+B-CART-01/02(카트 타이머)를 검증하는 구조는 재사용 가치 있음.
+2. **조작하는 게이트** — 야간 QA 워크플로우가 실제 검증 없이 성공 리포트를 만들어내는(fabricating) 상태라 삭제(`2bd1fb8a`). 실패할 수 없는 게이트(종이호랑이)의 상위 호환 악형: 실행은 되는데 결과가 거짓. 게이트 감사 시 "존재하나"가 아니라 "최근에 실행돼 실패할 수 있었나"를 물어야 한다.
 
 ## 미확인 (추가 조사 필요)
 - Settlement 커미션 계산/레코드 생성 위치 — 여전히 미확인. `prisma.settlement.create()` 호출이 코드베이스 전체에 0건(grep 확인); `settlement.service.ts`는 조회·엑셀 리포트만 구현. `Settlement.commission` 컬럼(schema.prisma:551)은 존재하지만 채우는 코드가 없다.
