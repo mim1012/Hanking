@@ -18,6 +18,7 @@
 - UX 마감(PR #2): 공식 브랜드 버튼(`BAGJO1/src/components/common/SocialLoginButtons.tsx:1` — #FEE500/#03C75A+심볼, 네이버 검수 요건), 실패 시 `/login?error=` 복귀+배너, 클릭 잠금(중복 PKCE 방지), `auth.ts`에 `pages.error='/login'`.
 
 ## 주의점 / 함정
+- **「소프트탈퇴·정지가 소셜 재로그인에 뚫림」(2026-07-22, opus CRITICAL로 검출·같은 날 봉합)** — credentials 경로에만 `status==='active'` 게이트를 두면, 소셜 유저는 그 경로를 안 타므로 **탈퇴·정지 회원이 카카오 재로그인으로 유효 세션을 재발급**받는다. 게다가 upsert가 OAuth 프로필로 name/이미지를 갱신하면 **PII 익명화가 실값으로 되돌아간다**. 봉합 3중: ① `signIn` 콜백에서 소셜도 `member.status !== 'active'`면 `false` 반환(세션 생성 자체 중단, jwt 콜백 미호출 — `BAGJO1/src/lib/auth.ts:60-69`) ② upsert는 active가 아닌 기존 행의 프로필을 절대 갱신 안 함(`BAGJO1/src/lib/members/repo.ts:186`) ③ 탈퇴 패치가 `provider_id`를 null화해 (provider, provider_id) 부분 유니크 인덱스에서 이탈 → 재로그인 시 매칭 자체가 불가, 신규 행 생성(재가입 시맨틱 — `BAGJO1/src/lib/members/withdrawalPatch.ts:24,38`). **소프트탈퇴를 설계할 때 "로그인 경로별 status 게이트 전수 + 소셜 식별자 절단"을 체크리스트로 쓸 것.**
 - **「소셜 이메일 매칭 admin 승격」** — OAuth가 돌려준 이메일(제공자 검증 여부 불명)을 기존 회원과 매칭해 레코드 전체(role 포함)를 상속하면, admin 이메일로 만든 소셜 계정이 관리자가 된다. security-reviewer가 CRITICAL로 검출 → role 강제 'user'로 차단(`socialAuth.ts:44`). 실DB 붙일 때도 이 규칙을 승계할 것.
 - **「UI 플래그 ≠ 접근제어」** — `NEXT_PUBLIC_SOCIAL_LOGIN`은 버튼 노출 게이트일 뿐, `/api/auth/*`는 키가 설정된 환경에선 항상 살아있다.
 - **「프리뷰 URL Redirect 불가」** — Vercel 프리뷰 URL은 매번 바뀌어 OAuth Redirect URI로 등록 불가 → 소셜 실테스트는 localhost/프로덕션 도메인 전용.
