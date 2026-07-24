@@ -56,3 +56,4 @@
 - 2026-07-22 | Compile(mini) | [[카카오-네이버-소셜로그인-AuthJS]] 함정 1건 추가 — 소프트탈퇴·정지가 소셜 재로그인에 뚫리는 클래스(BAGJO1 PR #196 opus CRITICAL: credentials에만 status 게이트 → 소셜은 세션 재발급+익명화 revert). 봉합 3중(signIn 콜백 status 게이트 auth.ts:60-69 · upsert active-only 가드 repo.ts:186 · 탈퇴 시 provider_id null화 withdrawalPatch.ts:24,38) — 앵커 3종 세션 내 실독 검증. 체크리스트 교훈: 소프트탈퇴 설계 시 '로그인 경로별 status 게이트 전수 + 소셜 식별자 절단'.
 - 2026-07-23 | Compile | 골든플로우-실구동-게이트 보강: 파일단위 배선 전수감사(PR #203)·미배선 스펙=죽은 코드·파이프 종료코드·signed URL CDN 캐시 함정 4건 추가
 - 2026-07-24 | Compile | 신규 concept [[CLAUDE.md-로드아웃-패턴]] 등재 — canonical project-loadout store.py(마커 멱등 append·corner 배타 exit2·init.py 위임 회수-재부착), 승격게이트: 검증=스크래치 실설치/재설치교체/배타거부 실측, 함정=야생설치·re.sub 백슬래시·통째덮어쓰기·이중지침드리프트 명명, dead-end=store.py 재작성·전역 단일본. README 개념 35→36
+- 2026-07-24 | Compile | [[CLAUDE.md-로드아웃-패턴]] 변형 추가 — 전역 슬림화(42.5KB→10.0KB 실측 76% 절감, rules 11개 아카이브, contract-gates·quality-gates 신규 입점, 활성 13곳 설치 후 전역 제거 순서). 설계문서 .omc/global-slim-design.md

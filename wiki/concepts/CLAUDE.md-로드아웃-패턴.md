@@ -19,6 +19,7 @@
 
 ## 다른 구현 / 변형
 - 원본: sunghopark-loadout(외부)의 store.py를 byte-exact 포팅 — 로직 재작성 없음, fragments 내용물만 이쪽 rules(`D:\.claude\rules\*`)로 재구성 (fragment 소스 매핑은 `D:\project\SESSION.md` 결정 기록 2026-07-09)
+- **전역 슬림화 확장(2026-07-24)** — fragment의 소스였던 전역 rules를 역방향 정리: 상시 로드 42.5KB→10.0KB(76% 절감). 코어(Windows 규율·stop-retrying·통신·보안·git·위키 질의·세션핸드오프 최소본)만 전역에 남기고, 11개 rule을 `D:\.claude\rules-archive\`로 이동(1커맨드 롤백). 신규 fragment 2종 입점: `contract-gates`(코너 "프로젝트 유형", 수주 게이트)·`quality-gates`(코너 "품질 관리", TDD·리뷰). 순서가 핵심: **fragment 보강 → 활성 프로젝트 13곳 설치 → 전역 제거** — 역순이면 미설치 폴더에 규율 공백. 설계 문서 `D:\Project\.omc\global-slim-design.md`
 - 조건부 문단 변형: 조각 안 `[X도 설치된 경우] …` 문구는 코드가 아니라 에이전트가 파일 안에서 판단 — 조각 간 약결합을 코드 복잡도 없이 달성
 
 ## 주의점 / 함정
