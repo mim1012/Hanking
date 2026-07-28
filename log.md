@@ -57,3 +57,5 @@
 - 2026-07-23 | Compile | 골든플로우-실구동-게이트 보강: 파일단위 배선 전수감사(PR #203)·미배선 스펙=죽은 코드·파이프 종료코드·signed URL CDN 캐시 함정 4건 추가
 - 2026-07-24 | Compile | 신규 concept [[CLAUDE.md-로드아웃-패턴]] 등재 — canonical project-loadout store.py(마커 멱등 append·corner 배타 exit2·init.py 위임 회수-재부착), 승격게이트: 검증=스크래치 실설치/재설치교체/배타거부 실측, 함정=야생설치·re.sub 백슬래시·통째덮어쓰기·이중지침드리프트 명명, dead-end=store.py 재작성·전역 단일본. README 개념 35→36
 - 2026-07-24 | Compile | [[CLAUDE.md-로드아웃-패턴]] 변형 추가 — 전역 슬림화(42.5KB→10.0KB 실측 76% 절감, rules 11개 아카이브, contract-gates·quality-gates 신규 입점, 활성 13곳 설치 후 전역 제거 순서). 설계문서 .omc/global-slim-design.md
+- 2026-07-24 | Compile | usage-widget 신규 등록: [[AI-구독-사용량-조회]] concept + [[project-usage-widget]] (Claude/Codex/DeepSeek/Kimi/GLM 사용량 조회+토큰 refresh)
+- 2026-07-28 | Compile(mini) | [[project-warm-agent]] 갱신: 로컬Windows→Kali VM·GLM→OpenRouter/kimi 헤더 정정 + 에이전트 인프라 학습 5건(OpenAI호환 프로바이더교체+OpenRouter models배열 폴백 telegram_bot.py:212,960 · 이름붙인실패 Anthropic 사이버필터가 offensive맥락 content_filter거부 · execv 제자리 self-restart systemd Popen→409회피 :4032,:3856 · 연결드롭 자동재개 :906 · vmrun MCP 배포기법). 앵커 5종 세션 내 grep 실검증. Tor 툴은 민감성 판단으로 위키 제외.
