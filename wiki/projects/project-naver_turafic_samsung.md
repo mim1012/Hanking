@@ -9,6 +9,9 @@
 - `server/lib/admin.js:510` `getExperimentHistory()`(+`buildStints:463`, `rankStatsInWindow:494`) — 전략 실행 로그와 외부 순위 피드를 조인해 전략(A/B/G/H)별 순위개선 스코어카드 산출. `server/web/admin/history.html` 모니터링 UI가 소비.
 - `server/dev-server.js` — npm 의존성 0, Node 표준 라이브러리만으로 계정 lease/heartbeat/rotation API. 무의존 계약 테스트 서버 패턴.
 - `docs/server-schema.sql`, `docs/vercel-supabase-api.md` — 프로덕션 API 계약 문서.
+- `android/SamsungTrafficBot/app/src/main/java/com/navertraffic/samsung/strategy/SamsungWebViewManager.kt:466` `clickMidLink()` — 캐러셀 상품 진입을 **실제 탭 우선**으로. 프로그램 이동(`loadUrl`)은 유입수 집계에서 누락된다(실측). → [[유입수-집계되는-진입]]
+- `tools/touch-record/parse-getevent.mjs` — `getevent -lt` 원시 터치 로그를 사람 리듬 통계(스와이프 거리·지속·속도, 탭 홀드, 동작 간격)로 환산. 실기기 녹화를 봇 상수로 옮기는 입구. → [[사람행동-시뮬레이션]]
+- `tools/adb-fleet/fleet.mjs` — 로컬 ADB 플릿 감시/자동복구(핫스팟 확인 대화상자 탭, 프록시 잔재 제거, adb 데몬 자가복구, 이름 중복 경고).
 
 ## 관계
 - **모체** = [[project-naver-traffic-android-samsung]] (0.1.x 릴리스 계보, 전략 A/B/C/G/H 전체). 이 레포는 그 봇 서버 분리 파생본. 버리는 커밋도 자매 클론 + reflog에 보존.

@@ -1,12 +1,12 @@
-﻿# lint ?먮룞 ?ㅽ뻾 (二쇨컙 ?ㅼ?以? ??2026-07-20 10:00
+﻿# lint ?먮룞 ?ㅽ뻾 (二쇨컙 ?ㅼ?以? ??2026-07-27 10:00
 
-pages: 88 (concepts 35, projects 39)
+pages: 91 (concepts 37, projects 40)
 
 DEAD LINKS: 0
 
 ORPHANS (no inbound links): 0
 
-FILE:LINE refs checked: 202, stale: 0
+FILE:LINE refs checked: 211, stale: 0
 
 log.md issues: 4
   line 40: ?뺤떇 遺덉씪移?(`- YYYY-MM-DD | ?ъ씠??| ?붿빟`)
@@ -14,5 +14,5 @@ log.md issues: 4
   line 47: ?뺤떇 遺덉씪移?(`- YYYY-MM-DD | ?ъ씠??| ?붿빟`)
   line 48: ?뺤떇 遺덉씪移?(`- YYYY-MM-DD | ?ъ씠??| ?붿빟`)
 
-README counts: 媛쒕뀗 35/35, ?꾨줈?앺듃 39/39 -> OK
+README counts: 媛쒕뀗 37/37, ?꾨줈?앺듃 40/40 -> OK
 
