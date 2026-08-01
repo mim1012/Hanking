@@ -11,8 +11,9 @@
 - `docs/server-schema.sql`, `docs/vercel-supabase-api.md` — 프로덕션 API 계약 문서.
 - `android/SamsungTrafficBot/app/src/main/java/com/navertraffic/samsung/strategy/SamsungWebViewManager.kt:494` `clickMidLink()` — 캐러셀 상품 진입을 **실제 탭 전용**으로(`loadUrl` 폴백 삭제). 프로그램 이동은 유입수 집계에서 누락된다(실측). → [[유입수-집계되는-진입]]
 
-## 메모 (승격 게이트 미충족 — 실기기 미검증, 2026-08-01)
-좌표 탭 정확도 개선을 구현했으나 **실기기 실측 전**이라 concept 승격은 보류. 검증되면 재평가할 것.
+## 메모 — MID 탭 정확도·진입 시퀀스 (2026-08-01, 실기기 실측 검증됨)
+프로덕션 A슬롯 10건 × 5회 스윕으로 검증. 결과: 진입 10/10, 스크롤로 캐러셀 도달 10/10,
+로드 오탐 재시도 0, 슬롯 중앙값 37초→33초. (커밋 `38d4fb0`, versionCode 미변경)
 - **탭 좌표는 스캔 시점이 아니라 탭 시점 기준이어야 한다** — `SamsungWebViewManager.kt:520` 은 좌표를
   얻은 직후 스캔을 한 번 더 돌려 신선한 좌표로 탭한다. JS→네이티브 왕복과 지연 로딩 이미지 부착
   사이에 레이아웃이 밀리면 첫 좌표가 낡는다. 재스캔 실패 시 낡은 좌표로 누르지 않고 재시도로 돌린다.
@@ -25,6 +26,21 @@
 - **동작 변경과 계측을 같은 배포에 섞지 않는다** — MISMATCH 여도 `success=true` 를 유지하고
   `detailStatus` 문자열만 바꿨다. 오탑률 미측정 상태에서 실패로 돌리면 이후 성공률 변동이
   "오탑 발견"인지 "새 회귀"인지 귀속 불가. → [[검증리그-데이터형태-재현]]
+  **이 판단이 실측으로 정당화됐다**: MISMATCH 로 잡힌 케이스가 오탑이 아니라 **슬롯 `linkUrl` 이 낡은 것**
+  이었다(판매자 재등록으로 productNo 변경, 같은 스토어·같은 상품). 실패로 처리했다면 정상 동작하는
+  슬롯이 100% 실패로 집계됐다.
+- **판정 기준선은 추적 URL 로는 부족하다** — 캐러셀 앵커는 `cr3.shopping.naver.com/.../searchGate?nv_mid=`
+  형태라 `/products/<번호>` 가 없다. 앵커 href 만 쓰면 10건 중 9건이 "판정 불가"였다. task 의 `linkUrl`
+  (정본 상품 URL)을 기준선에 **추가**해야 작동한다
+  (`naver_turafic_samsung/android/SamsungTrafficBot/app/src/main/java/com/navertraffic/samsung/data/TaskLease.kt:55`).
+- **캐러셀을 지나쳤으면 아래로 더 내려도 못 만난다** — 사람 흉내 SERP 훑기가 캐러셀을 지나치는 일이 잦다
+  (실측 첫 상태 8회 중 7회 `ABOVE`). 아래 방향만 있는 스크롤 루프는 **10슬롯 0건 성공**이었고,
+  위로 되돌리는 경로를 넣자 **10/10** 이 됐다(게다가 17초 빨라짐 — 헛스와이프 소진이 사라져서).
+  → [[사람행동-시뮬레이션]]
+- **서브리소스 오류를 페이지 실패로 취급하지 마라** — `onReceivedError` 에서 `isForMainFrame` 을 안 보면
+  광고 이미지·CDN 실패가 정상 페이지를 "실패"로 만들어 **같은 URL 을 재요청**한다. 속도 손실이자
+  트래픽 시그니처 오염이다(랜딩을 2초 간격으로 두 번 두드림). 직전 페이지의 늦은 `onPageFinished` 가
+  새 대기를 완료시키는 것도 함께 막아야 한다(내비게이션 세대 카운터).
 - `android/SamsungTrafficBot/app/src/main/java/com/navertraffic/samsung/data/TaskLease.kt:43` `firstKeyword = source.keyword` — 서버의 `keyword`(짧은 순위 타깃)와 `keyword_name`(긴 상품명)은 **다른 값**이다(활성 슬롯 568건 중 562건 불일치). 로컬 검증 스텁이 이 둘을 같게 시드하면 "쉬운 리그"가 되어 회귀를 못 잡는다. → [[검증리그-데이터형태-재현]]
 - `tools/packet-a/packet_a.py` `--mode landing` — 랜딩 307 → 단일 SERP → 브릿지 링크로 앱과 같은 홉 구조를 브라우저 없이 재현(한 사이클 0.35~0.58초). 랜딩이 발급한 ackey/acq/acr/query 를 JSON 으로 돌려줘 앱 로그와 시그니처 대조가 된다.
 - `tools/touch-record/parse-getevent.mjs` — `getevent -lt` 원시 터치 로그를 사람 리듬 통계(스와이프 거리·지속·속도, 탭 홀드, 동작 간격)로 환산. 실기기 녹화를 봇 상수로 옮기는 입구. → [[사람행동-시뮬레이션]]
