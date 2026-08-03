@@ -46,6 +46,32 @@
 - `tools/touch-record/parse-getevent.mjs` — `getevent -lt` 원시 터치 로그를 사람 리듬 통계(스와이프 거리·지속·속도, 탭 홀드, 동작 간격)로 환산. 실기기 녹화를 봇 상수로 옮기는 입구. → [[사람행동-시뮬레이션]]
 - `tools/adb-fleet/fleet.mjs` — 로컬 ADB 플릿 감시/자동복구(핫스팟 확인 대화상자 탭, 프록시 잔재 제거, adb 데몬 자가복구, 이름 중복 경고).
 
+## 메모 — 브라우저 정체성 헤더 와이어 실측 (2026-08-03)
+mitmproxy 전수 캡처(네이버/pstatic 114건) + 헤더 에코 페이지 두 경로로 교차 확인.
+
+- **UA ↔ sec-ch-ua 불일치는 해결돼 있다(114/114 일치).** 2026-06-01 캡처에서는 UA 가 `Chrome/137` 인데
+  sec-ch-ua 가 `"Android WebView";v="138"` 로 **브라우저 종류도 버전도** 어긋났다. `applyPersona()` 단일 경로 +
+  `BrowserIdentity` 로 어긋난 조합을 타입상 표현 불가능하게 만든 것이 와이어에서 검증됐다.
+  → 프로덕션 라이브 `vc161 / 0.1.83` 에 이미 반영된 상태.
+- **고엔트로피 클라이언트 힌트가 빈 값으로 새던 문제도 해소됐다.** 6월엔 `sec-ch-ua-model: ""`,
+  `sec-ch-ua-arch: ""` 등이 붙어 나갔으나 지금은 아예 안 나간다(Accept-CH 미요청 시 정상 동작).
+- **`X-Requested-With: com.navertraffic.samsung` 은 100% 노출된다(113/113).** 앱 레벨 해결책이 없다 —
+  상세는 [[봇탐지-우회-스택]] 의 dead-end 항목. 과거 커밋 `90c27e8` "X-Requested-With 로 앱 패키지명 노출 차단"은
+  **실제로는 차단된 적이 없다.**
+- **`sec-fetch-site: none`** — `loadUrl` 진입이라 "주소창에 직접 입력"으로 보인다. 반면 상품 진입은 실제 탭이라
+  `same-site` + `referer` 가 정상으로 붙는다. → [[유입수-집계되는-진입]] 의 구분선과 같은 자리.
+  `zero-android-optionc/app/src/main/java/com/zero/traffic/engine/ActionExecutor.java:1288` `computeSecFetchSite()`
+  는 이전 URL 로 이 값을 계산해 덮어쓴다(우리는 미적용).
+
+## 메모 — S7 커스텀 ROM 준비 (2026-08-03, 미실행)
+`SM-G930K`(heroltektt, Android 8.0/SDK26)에서 **크롬 143 은 커스텀 ROM 으로만 가능**하다
+(Chrome 139+ 가 Android 10/API 29 를 요구). herolte 용 LineageOS 20(Android 13) zip 의
+`META-INF/com/android/metadata` `pre-device` 에 **`heroltektt` 가 명시**돼 있어 한국 통신사 변종 호환이 선언돼 있다.
+하드 브릭은 **다른 모델 스톡 펌웨어(BL/CP 포함)** 를 올릴 때만 나고, 커스텀 ROM/TWRP 는 최악이 부트루프다.
+**"크롬 143 설치" != "봇 엔진 143"** — 봇은 WebView 로 도므로 판정은 `dumpsys webviewupdate` 의 제공자 줄.
+펌웨어는 `samloader-rs`(topjohnwu) 로 삼성 공식 서버에서 받는다 — 파이썬 samloader 계열은 FUS 인증 키가
+바뀌어 nonce 복호화에서 전부 실패하고, 서드파티 사이트는 403/reCAPTCHA 로 막힌다.
+
 ## 관계
 - **모체** = [[project-naver-traffic-android-samsung]] (0.1.x 릴리스 계보, 전략 A/B/C/G/H 전체). 이 레포는 그 봇 서버 분리 파생본. 버리는 커밋도 자매 클론 + reflog에 보존.
 
