@@ -11,5 +11,6 @@
 
 - `ANALYSIS_REPORT.md:§9`(2026-08-03 추가) — **base URL 동적 확정 + 도메인 OSINT**: 정적분석 실패 후 x86_64 에뮬레이터+Frida로 `getBaseUrl()="https://api.gudservice.com"` 확보(실기기 netstat 관찰 IP와 교차검증). WHOIS(Privacy Protect+1984 ehf로 등록자 완전 익명화, 등록일 2026-03-12)와 crt.sh 인증서 이력(2021-10-22부터, 서브도메인 `admin.`/`partner-api.` 확인) 대조에서 **도메인 재등록(드롭캐치) 이력 불일치** 발견. → 절차 자체는 [[ARM64네이티브-동적후킹-Frida에뮬레이터]] concept로 분리 등재.
 - `dynamic-analysis/hook_secureconfig.py`, `dynamic-analysis/frida-agent/` — 재사용 가능한 Frida 후킹 스크립트(canonical, 위 concept 참고).
+- `ANALYSIS_REPORT.md:§10`(2026-08-03 추가) — **Blutter로 libapp.so(Dart AOT) 정적 복원**: 앱의 실제 클린아키텍처 구조 전체 확보, `ApiClient.post/get`의 `requiresAuth=true` 기본값+로그인 단일 예외를 코드로 확정(로그인 제외 전 엔드포인트 토큰 필수). 절차는 [[Flutter-DartAOT-Blutter정적복원]] concept로 분리 등재.
 
-## 의존 개념: [[디컴파일-ViewId-자동화]] · [[TLS-임퍼소네이션-WAF우회]] · [[ARM64네이티브-동적후킹-Frida에뮬레이터]]
+## 의존 개념: [[디컴파일-ViewId-자동화]] · [[TLS-임퍼소네이션-WAF우회]] · [[ARM64네이티브-동적후킹-Frida에뮬레이터]] · [[Flutter-DartAOT-Blutter정적복원]]
