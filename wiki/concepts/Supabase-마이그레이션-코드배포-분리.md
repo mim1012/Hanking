@@ -53,6 +53,17 @@ Vercel(또는 다른 서버리스) + Supabase 조합에서 "컬럼 추가 + 그 
   추측해서 시도했으나 각각 "tenant/user not found"와 DNS 해석 실패로 불통. 저장소에 실제
   `DATABASE_URL`이 기록돼 있지 않으면 호스트명을 추측으로 맞히는 건 비용 대비 낮은 성공률 —
   대시보드 SQL Editor가 더 빠르다.
+- **(2026-08-06 재확인) direct 호스트는 IPv6 전용 라우트다 — 로컬 샌드박스도 GitHub Actions
+  러너도 둘 다 막힌다.** DNS는 정상 해석되지만 `connect ENETUNREACH 2406:...5432`로 실패(IPv6
+  라우트 없음). CI로 마이그레이션 자동적용 워크플로우(`scripts/apply-supabase-migrations.mjs`
+  + `SUPABASE_DB_URL` 시크릿)까지 만들었는데 **GitHub Actions 러너에서도 같은 에러로 실패** —
+  로컬 문제가 아니라 direct 호스트 자체의 구조적 제약이라는 뜻. Session Pooler(리전 추측,
+  `aws-0-{us-east-1,us-east-2,us-west-1,eu-central-1,eu-west-1,eu-west-2,sa-east-1,ap-south-1,
+  ap-northeast-1,ap-northeast-2}`)도 전부 "tenant/user not found"로 실패 — 이 프로젝트의
+  진짜 pooler 리전을 못 찾음(대시보드에서 직접 복사한 연결 문자열이 아니면 리전 추측 자체가
+  비용 대비 낮은 성공률이라는 위 교훈이 CI 환경에서도 그대로 적용됨). **다음 세션 숙제**: 대시보드
+  Connection Pooling 탭에서 정확한 Session Pooler 문자열을 사용자에게 직접 받을 것 — 추측 재시도
+  금지(스톱-리트라잉 원칙).
 
 ## 검증된 성공
 

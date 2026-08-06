@@ -72,6 +72,41 @@ mitmproxy 전수 캡처(네이버/pstatic 114건) + 헤더 에코 페이지 두 
 펌웨어는 `samloader-rs`(topjohnwu) 로 삼성 공식 서버에서 받는다 — 파이썬 samloader 계열은 FUS 인증 키가
 바뀌어 nonce 복호화에서 전부 실패하고, 서드파티 사이트는 403/reCAPTCHA 로 막힌다.
 
+## 메모 — z1~z6 쿠키정책 실험 + PC 웜업 쿠키풀 (2026-08-06, 0.2.2/v209 OTA 배포됨)
+
+- `android/SamsungTrafficBot/app/src/main/java/com/navertraffic/samsung/strategy/NaverCookieStore.kt:154`
+  — 로그인 쿠키(`NID_AUT`/`NID_SES`/`NID-JKL`/`NID_JKL`, `NAVER_REUSABLE_COOKIE_NAMES`)와 방문자
+  식별 쿠키(`NNB`/`BUC`, 새로 추가한 `NAVER_VISITOR_COOKIE_NAMES`)는 **서로 다른 계층**이다. 게스트
+  아암은 로그인 쿠키가 애초에 안 생기므로, 게스트 흐름의 "쿠키정책" 실험이 실제로 건드리는 건
+  방문자 식별 계층뿐이다.
+- **NNB/BUC는 모바일 도메인(`m.naver.com`)에서만 실측 발급됐다** — PC 도메인(`www.naver.com`,
+  `channel:'chrome'`)으로 patchright 웜업을 돌렸을 땐 `NAC`/`NACT`만 찍히고 NNB/BUC는 없었다.
+  번들 Chromium + `m.naver.com`으로 바꾸자 즉시 발급됨(`tools/cookie-pool-bridge/deep-warmup.mjs`).
+  이유는 미확인이지만(PC 크롬채널 미탐지 vs 모바일 UA 차이 등 여러 가설 가능), **재현된 사실**은
+  모바일 도메인 대상 웜업만 신뢰할 것.
+- `adpang-production/src/lib/android-admin-server.ts` `claim_naver_visitor_cookie` RPC —
+  `FOR UPDATE SKIP LOCKED`로 가장 오래된 `available` 행 하나를 원자적으로 잠그고 `claimed`로 전환.
+  select→update 2단계로 짜면 동시 요청 두 개가 같은 행을 받는 경쟁이 생긴다(named failure) — 이
+  프로젝트엔 이미 같은 패턴의 선례가 있었다(`claim_next_device_command`, `add-android-admin-tables.sql`).
+  실측 검증: z90-1이 claim한 뒤 z90-2가 같은 요청을 하면 `{nnb:null,buc:null}`(빈손) — 중복배정 0건.
+- `adpang-production` `slot_pinned_strict`(`device_group`) — 기존 `target_group_id`(슬롯 핀)는
+  "이 슬롯은 이 그룹만"만 강제하지 "이 그룹은 이 슬롯만"은 강제 안 했다(named failure, 실측: z1이
+  핀 밖 슬롯을 261/755건=35% 가져감). `leaseTask()`의 후보 쿼리를 "다른 그룹 제외"에서 "내 그룹만
+  포함"으로 반대 방향으로 바꾸고, 핀 슬롯이 하나도 없으면 즉시 `traffic_queue_empty`(일반 큐 폴백
+  없음)로 고쳐야 양방향이 다 막힌다.
+- **네이버 bizadvisor `num_interaction`(실시간 유입수)은 누적 카운터가 아니라 30분 롤링 윈도우다**
+  (사용자 실측 확인). 20분 관측에서 단조증가만 보였던 이전 세션 결론은 "그 20분 동안 우연히 신규유입이
+  롤오프보다 많았을 뿐"이었다 — 전후 델타로 ΔI를 재는 실험은 관측창을 30분보다 충분히 짧게 잡아야
+  롤오프 오염이 작다(4분 창은 실사용, 배경 잡음은 동시에 도는 다른 실기기/봇 트래픽).
+- **Vercel "Sensitive" 환경변수는 `vercel env pull`로도 절대 값이 안 나온다**(`[SENSITIVE]` 마스킹,
+  CLI/API 우회 불가 — dead-end). `LANDING_BASE_URL`처럼 sensitive로 표시된 값은 실제 배포된 서비스에
+  직접 요청을 보내 응답(리다이렉트 목적지 등)으로 역산하는 수밖에 없었다 — 이번엔 후보 도메인 3개에
+  `/r/<keyword>` 를 직접 쳐서 `www.adpangshopping.co.kr`을 찾아냈다.
+- Supabase 직접연결(`db.<ref>.supabase.co:5432`)은 이 세션의 샌드박스와 GitHub Actions 러너 둘 다에서
+  `ENETUNREACH`/DNS 실패(IPv6 전용 라우트로 추정) — 마이그레이션 자동적용 CI가 이걸로 막힘(dead-end).
+  Session Pooler(`aws-0-<region>.pooler.supabase.com`)도 여러 리전 다 "tenant/user not found"로
+  실패해 원인 미해결로 남음 — 다음 세션 숙제.
+
 ## 관계
 - **모체** = [[project-naver-traffic-android-samsung]] (0.1.x 릴리스 계보, 전략 A/B/C/G/H 전체). 이 레포는 그 봇 서버 분리 파생본. 버리는 커밋도 자매 클론 + reflog에 보존.
 
