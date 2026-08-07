@@ -107,6 +107,38 @@ mitmproxy 전수 캡처(네이버/pstatic 114건) + 헤더 에코 페이지 두 
   Session Pooler(`aws-0-<region>.pooler.supabase.com`)도 여러 리전 다 "tenant/user not found"로
   실패해 원인 미해결로 남음 — 다음 세션 숙제.
 
+## 메모 — 브랜치 정리 + 0.2.4~0.2.6 릴리스 3연속 + 성공률 저조 근본원인(IP 밀도) 규명 (2026-08-07)
+
+- **브랜치를 `main` 하나로 통합.** `group-cookie-policy-experiment`(실질 프로덕션 계보였음)를 `main`에
+  병합·fast-forward, 완전 병합된 `landing-timing-verification`/`release/strategy-b-landing-query`
+  로컬+원격 삭제. `real-device-fingerprint-experiment`(의도적으로 프로덕션 미병합 실험)만 보존.
+  main이 몇 주째 0.1.90에 정체돼있던 이유는 실질 작업이 전부 다른 브랜치에서 진행됐기 때문 —
+  주기적으로 계보를 맞추지 않으면 "메인이 몇 달 전 상태"가 반복된다.
+- **0.2.4**: `navigator.hardwareConcurrency`/`deviceMemory` 하드코딩값(4/4)이 정적 CHROME persona가
+  광고하는 model(SM-S911B=갤럭시S23, 실제 8코어/8GB+)과 모순되던 걸 8/8로 정합화.
+- **0.2.5**: 화면 하단 상시 리드아웃(`tvIdentity`)에 `versionName`/`versionCode` 추가 — adb 없이
+  실기기 화면에서 현재 빌드 확인 가능.
+- **0.2.6**: `android_devices.current_ip` 하트비트 리포트 추가(신규 `PublicIpResolver`, TTL 5분 캐시,
+  `api.ipify.org`, 실패 시 무음 폴백) — 아래 IP 밀도 상관분석의 관측 인프라.
+- **named failure — "코드부터 보고 서버 실제 배정을 나중에 확인"한 순서가 헛다리를 두 번 낳았다**:
+  (1) `TemplateSearchStrategy.kt`(G/H 전용)에 `SamsungBrowserStrategyB.kt`(A→게스트B, 실제 라이브
+  경로)의 2026-08-05 캡차 재체크 패턴을 기계적으로 포팅했으나, 서버가 최근 2시간 리스 1,000건 전부
+  `strategy_group=A`만 배정 중이라 G/H는 죽은 코드였다(즉시 revert). (2) "z90=와이파이라 잘 됨"
+  가설도 실측 없이 이전 세션 메모만으로 단정했다가 사용자 확인으로 반증됨(z90도 셀룰러 핫스팟
+  공유). **교훈**: "왜 이 경로가 안 되지"류 조사는 라이브 데이터로 실제 실행경로부터 확정한 뒤
+  코드를 봐야 한다 — 순서를 바꾸면 존재하지 않는 버그를 고치는 데 시간을 쓴다.
+- **성공률 저조 근본원인 = 공유 핫스팟 IP당 요청밀도** (풀 상세는 [[IP-로테이션]] 함정/dead-end
+  참고). z90(병사 2대)=78~95%, z1~z4(병사 6~7대)=11~30% — 코드/UA/쿠키정책/entry_method 전부
+  동일한데도 격차가 그대로였고, IP 강제 로테이션도 무효했다. **원래 아키텍처 자체가 "boss 1대만
+  유심, 병사는 무료로 핫스팟 공유"로 유심 비용을 아끼려고 설계된 트레이드오프**였는데, 지금 데이터는
+  그 트레이드오프가 실패 트래픽/시간 손실로 역전되고 있을 가능성을 보여준다 — 해법은 병사당 IP를
+  늘리거나(유심 추가) boss당 병사 수를 낮추는(밀도 감소) 물리적 재구성이며, 코드로 고칠 수 있는
+  범위 밖이다.
+- **큐 "적체"로 보였던 것은 leaseTask 버그가 아니라 성공률 저조의 증상.** `sellermate_traffic_navershopping`이
+  20분 주기 크론으로 리필되는데, 실패한 태스크가 `attempt_count<max_attempts(3)`로 재큐잉되면서
+  성공률이 20~30%대인 지금은 채워지는 속도를 못 따라가 "쌓인 것처럼" 보인다. 큐 게이팅 로직
+  (`slot_pinned_strict`, `device_group` 상태, 계정풀)은 전부 정상이었다.
+
 ## 관계
 - **모체** = [[project-naver-traffic-android-samsung]] (0.1.x 릴리스 계보, 전략 A/B/C/G/H 전체). 이 레포는 그 봇 서버 분리 파생본. 버리는 커밋도 자매 클론 + reflog에 보존.
 
