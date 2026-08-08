@@ -2,7 +2,7 @@
 
 > Karpathy LLM Wiki 패턴 구현. "이 기능 어디서 주워와?"에 즉시 답하는 재사용 색인.
 > Obsidian으로 이 폴더(`D:\Project\_wiki`)를 볼트로 열면 그래프 뷰 + `[[링크]]` 그대로 동작.
-> 현재: 개념 42 · 프로젝트 40 (죽은 링크 0).
+> 현재: 개념 42 · 프로젝트 41 (죽은 링크 0).
 
 ## 🗺️ 도메인별 지도 (여기서 시작)
 - [[네이버-트래픽-커머스]] · [[트레이딩]] · [[앱-자동화-리버싱]] · [[웹앱-SaaS]] · [[소셜-수집]] · [[에이전트-인프라]]
@@ -48,6 +48,8 @@
 - [[project-massage]] · [[project-medical-ERP]] · [[project-wishcat]] · [[project-BAGJO1]] · [[project-tableflow]]
 ### 에이전트 인프라
 - [[project-warm-agent]] · [[project-hermes-agent]] · [[project-oh-my-codex]] · [[project-Decepticon]] · [[project-claude-cockpit]] · [[project-usage-widget]]
+### 게임 유틸/로컬 OCR
+- [[project-starcraft-dashboard]]
 
 ## 통합 후보 (중복 지식 → 라이브러리화)
 1. **IP 로테이션** — electrone/sellermate/android-samsung/turafic/insta 5곳 → 단일 라이브러리

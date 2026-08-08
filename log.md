@@ -2,6 +2,7 @@
 
 > 규칙: Ingest/Compile/Lint/배선 변경마다 아래에 한 줄 append. 수정·삭제 금지(append-only).
 > 형식: `- YYYY-MM-DD | 사이클 | 요약`
+- 2026-08-08 | Ingest+Compile(mini) | starcraft_dashboard: 구글드라이브에서 숨고 외주 인수인계 프로젝트(정은석, 초월자강화기 보스클리어 OCR 대시보드) 신규 유입. cv2.imread 유니코드경로 버그 수정으로 OCR 8/8 크래시→정상, 정규식 오독보정(클리어→흘리어/처치→저치/초월석→소월석 등)으로 파싱률 개선, ttk.Style() 다크테마 적용, config 경로버그(cwd상대경로) 수정, PyInstaller onefile 빌드 시도(1차 exit0였으나 scipy._cyutility 누락으로 실행즉시크래시 실증 확인 — "빌드성공≠실행가능" 사례, --collect-all scipy로 재빌드는 세션종료 시점 미완료). 신규 concept 미승격: cv2.imread 우회/config영속화패턴 둘 다 dead-end(실패한 대안 시도) 기록이 없어 게이트3 미충족, project-starcraft-dashboard 메모로만 기록(규칙7). project-starcraft-dashboard 신규 등록, README "게임 유틸/로컬 OCR" 도메인 신설. 앵커 ocr_engine.py:14, data_manager.py:16, HANDOFF.md:1 세션 내 실독·실행(ocr_test.py 8/8, main.py 스크린샷) 검증.
 
 - 2026-07-05 | Compile | 위키 최초 생성 — raw/wiki/schema 3계층, 개념 19 · 프로젝트 23, X 사례조사 인제스트
 - 2026-07-05 | Compile | massage 자산 회수 — [[서버리스-공유-레이트리밋]] · [[요청-코얼레싱-인플라이트]] · [[레거시-코드체계-호환-필터]] 신설, [[project-massage]] 상태 종료(환불)로 갱신
