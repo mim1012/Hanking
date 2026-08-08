@@ -15,6 +15,7 @@ Supabase(PostgREST)에서 히스토리·로그처럼 행이 많은 테이블을 
 
 ## 주의점 / 함정
 - **"PostgREST 1000행 사일런트 캡"** — 응답이 잘려도 에러가 아니다. `.in()` + 앱단 max 계산은 행이 1000을 넘는 순간 조용히 틀린 값을 낸다(목록↔상세 모달 순위 불일치의 실제 근원 버그). 정렬 없거나 ASC면 최신이 캡 밖으로 사라진다.
+- **"카운트 창(window) 방향과 소비(consume) 방향 불일치"(2026-08-08 실측)** — 위 캡과는 다른 함정: `created_at DESC LIMIT N` 창으로 "최근 N행 중 claimed 비율"을 세려 했는데, 실제 claim 함수(`claim_naver_visitor_cookie` 계열, FIFO)는 `created_at ASC`로 **가장 오래된 행부터** 집어간다. 풀이 N행을 넘는 순간, 창이 보는 "최근 N행"에서 정작 claimed로 바뀌는 행들(가장 오래된 것들)이 창 밖으로 밀려나 카운트가 체계적으로 과소집계(작은 풀에선 무증상이라 늦게 발견됨). 고침: `adpang-production/src/lib/android-admin-server.ts`의 `getAdminSnapshot()` — 카운트는 `select('id', {count:'exact', head:true})` 조건별 쿼리 2개(available/claimed-in-24h)로 분리하고, "최근 N건 미리보기"만 별도의 `created_at DESC LIMIT 10` 쿼리로 남김. **일반화**: 큐/풀 테이블에서 "최근 N행 창"으로 상태 카운트를 낼 때, 그 테이블을 소비하는 함수의 소비 순서(ASC/DESC, FIFO/LIFO)가 창의 정렬 방향과 반대면 캡이 없어도 과소/과대집계가 난다 — 카운트는 항상 exact-count 쿼리로, 미리보기는 별도 쿼리로 분리할 것.
 - bigint PK/컬럼은 PostgREST에서 **문자열**로 온다 → 비교/계산 전 `Number()` 정규화 필수(안 하면 `"9" > "10"` 문자열 비교 오류).
 - 키셋 커서는 정렬키와 tie-breaker(고유 컬럼)를 함께 물어야 중복/누락이 없다.
 
