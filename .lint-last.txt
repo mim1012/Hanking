@@ -1,19 +1,22 @@
-﻿# lint ?먮룞 ?ㅽ뻾 (二쇨컙 ?ㅼ?以? ??2026-08-03 10:00
+﻿# lint ?먮룞 ?ㅽ뻾 (二쇨컙 ?ㅼ?以? ??2026-08-10 10:00
 
-pages: 93 (concepts 39, projects 40)
+pages: 97 (concepts 42, projects 41)
 
-DEAD LINKS: 0
+DEAD LINKS: 2
+  wiki\concepts\Flutter-DartAOT-Blutter?뺤쟻蹂듭썝.md -> [[kali-migration]]
+  wiki\concepts\Flutter-DartAOT-Blutter?뺤쟻蹂듭썝.md -> [[kali-migration]]
 
 ORPHANS (no inbound links): 0
 
-FILE:LINE refs checked: 223, stale: 0
+FILE:LINE refs checked: 240, stale: 0
 
-log.md issues: 5
-  line 40: ?뺤떇 遺덉씪移?(`- YYYY-MM-DD | ?ъ씠??| ?붿빟`)
+log.md issues: 6
+  line 7: ?좎쭨 ??닚 (2026-07-05 < 2026-08-08)
   line 41: ?뺤떇 遺덉씪移?(`- YYYY-MM-DD | ?ъ씠??| ?붿빟`)
-  line 47: ?뺤떇 遺덉씪移?(`- YYYY-MM-DD | ?ъ씠??| ?붿빟`)
+  line 42: ?뺤떇 遺덉씪移?(`- YYYY-MM-DD | ?ъ씠??| ?붿빟`)
   line 48: ?뺤떇 遺덉씪移?(`- YYYY-MM-DD | ?ъ씠??| ?붿빟`)
-  line 62: ?뺤떇 遺덉씪移?(`- YYYY-MM-DD | ?ъ씠??| ?붿빟`)
+  line 49: ?뺤떇 遺덉씪移?(`- YYYY-MM-DD | ?ъ씠??| ?붿빟`)
+  line 63: ?뺤떇 遺덉씪移?(`- YYYY-MM-DD | ?ъ씠??| ?붿빟`)
 
-README counts: 媛쒕뀗 39/39, ?꾨줈?앺듃 40/40 -> OK
+README counts: 媛쒕뀗 42/42, ?꾨줈?앺듃 41/41 -> OK
 

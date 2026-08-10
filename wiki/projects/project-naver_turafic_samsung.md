@@ -72,6 +72,15 @@ mitmproxy 전수 캡처(네이버/pstatic 114건) + 헤더 에코 페이지 두 
 펌웨어는 `samloader-rs`(topjohnwu) 로 삼성 공식 서버에서 받는다 — 파이썬 samloader 계열은 FUS 인증 키가
 바뀌어 nonce 복호화에서 전부 실패하고, 서드파티 사이트는 403/reCAPTCHA 로 막힌다.
 
+## 메모 — vc252 접근성 게이트 + OTA 운영 패턴 (2026-08-10, 실기기/피드 검증)
+
+- **구현**: `AccessibilitySelfHeal.kt:60-78`이 root secure settings 복구와 실제 service binding 확인을 최대 3회 수행한다. `MainActivity.kt:921-929`는 미바인딩이면 30초 간격으로 확인될 때까지 작업을 시작하지 않는다.
+- **입력 경로**: `WebViewGestureEngine.kt:245-273,299-341`이 탭·스크롤을 접근성 `dispatchGesture`로만 보내고, 서비스가 끊기면 `accessibility_required:*`로 보고한다. 합성 `dispatchTouchEvent` 폴백은 제거했다.
+- **배포**: `tools/ota/deploy-ota.mjs:32-63`로 `0.2.15/vc252`를 Storage와 `app_releases`에 올리고 enabled 최상위 버전/SHA를 확인했다. APK SHA256=`b9dd54947812f1fcebb26002afa1b5a24034f54063a60f3a7b823d87e6144a66`, 소스 태그 `android-0.2.15`→`efc290e`.
+- **카나리아**: z90-3에 `adb install -r` 성공, `versionCode=252/versionName=0.2.15`, 프로세스 유지, `BrowserAccessibilityService` enabled/bound 확인. 단말 기본 네트워크가 없어 실제 태스크 성공률은 아직 측정하지 않았다.
+- **플릿 큐**: 대장·`z6`·z90-3을 제외한 쫄병 31개 고유 대상에 `UPDATE_APP` 대기. Supabase에는 과거 중복 행까지 포함해 80개 pending 행이 있으므로, 운영 지표는 행 수가 아니라 고유 기기별 최신 명령/heartbeat로 집계한다.
+- **재사용 판단**: OTA 피드 등록만으로 실행 중 플릿의 적용 시점을 보장하지 못하므로, 피드 업로드·SHA 검증·기기별 deferred update 명령·접근성 바인딩 확인을 하나의 릴리스 게이트로 묶는다. → [[앱-자동업데이트-채널]] · [[State-Machine-접근성서비스]]
+
 ## 메모 — z1~z6 쿠키정책 실험 + PC 웜업 쿠키풀 (2026-08-06, 0.2.2/v209 OTA 배포됨)
 
 - `android/SamsungTrafficBot/app/src/main/java/com/navertraffic/samsung/strategy/NaverCookieStore.kt:154`
