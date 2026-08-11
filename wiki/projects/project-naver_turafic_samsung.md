@@ -148,7 +148,23 @@ mitmproxy 전수 캡처(네이버/pstatic 114건) + 헤더 에코 페이지 두 
   성공률이 20~30%대인 지금은 채워지는 속도를 못 따라가 "쌓인 것처럼" 보인다. 큐 게이팅 로직
   (`slot_pinned_strict`, `device_group` 상태, 계정풀)은 전부 정상이었다.
 
+## 메모 — 크롬 CDP 브리지 PoC + ANR 근본 차단 (2026-08-11, 실기기 검증)
+
+- **CDP 브리지 PoC 전 단계 통과**: 앱이 root로 shell 권한 브리지(app_process + dex)를 띄워
+  `127.0.0.1:9223 ⇄ @chrome_devtools_remote`를 중계. location.href·Runtime.evaluate·앵커 클릭·
+  재부팅 후 자동 복구까지 검증. → [[크롬-CDP-온디바이스-브리지]]
+- **ANR 근본 차단**: 접근성 순회가 system_server를 경유해 크롬 노드를 Binder로 읽어 ANR의
+  원인이었다. CDP 제어 모드면 자가복구를 건너뛰고 disableSelf()로 접근성을 내린다. 실기기
+  2대에서 ANR 0건·접근성 순회 0건·봇 정상 가동. 커밋 `345e00e7`.
+- **MID 앵커 적중률 미달 (~7%)**: 쇼핑 블록 지연 로딩 + 타깃 MID가 SERP에 안 나올 수
+  있음. 5라운드 탐색 루프(스크롤 600px + 1.8초 대기)와 `nv_mid=` 선택자를 넣었으나 목표
+  80%(20타 중 16타)에 못 미침 → 플릿 배포 보류, webview(63.9%) 유지.
+- **채널 분리 피드 수정**: 운영 getLatestAndroidRelease가 channel 쿼리를 무시하던 버그 수정.
+  `?channel=webview` → vc502, `?channel=chrome` → vc503 프로덕션 검증. 커밋 `abbd3d22`.
+- **관련 dead-end**: 앱이 직접 abstract 소켓에 붙기(UID 거부), 접근성으로 크롬 DOM 읽기
+  (ANR), Shizuku(수동 활성화).
+
 ## 관계
 - **모체** = [[project-naver-traffic-android-samsung]] (0.1.x 릴리스 계보, 전략 A/B/C/G/H 전체). 이 레포는 그 봇 서버 분리 파생본. 버리는 커밋도 자매 클론 + reflog에 보존.
 
-## 의존 개념: [[IP-로테이션]] · [[캡차-차단-대응]] · [[네이버-순위-계산]] · [[봇탐지-우회-스택]]
+## 의존 개념: [[IP-로테이션]] · [[캡차-차단-대응]] · [[네이버-순위-계산]] · [[봇탐지-우회-스택]] · [[크롬-CDP-온디바이스-브리지]]
