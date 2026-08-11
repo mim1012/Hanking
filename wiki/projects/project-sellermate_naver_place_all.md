@@ -19,4 +19,8 @@
 - **줄바꿈 함정** — zip은 CRLF, 로컬은 LF라 `diff`/`git diff`가 전 파일 재작성으로 보인다. 비교·커밋 전에 LF 정규화할 것(정규화 후 `parallel-rank-checker.ts` diff 2001줄 → 473줄).
 - **노출된 시크릿** — `rank-check/batch/check-ab-ranks.ts:10` 외 3개 레거시 파일에 Supabase service_role 키가 하드코딩돼 이미 커밋돼 있다. 텔레그램 zip의 `launcher/embedded-install-env.gen.ts`와 동일 키. 회전 필요(미조치).
 
+- **2026-08-11 서버 5대 배포** — 110.10.98.98(01), 222.239.102.81(02), 1.234.35.146(03), 222.239.36.44(04), 58.236.58.176(05). `PC_ID=sellermate-0N`으로 슬롯 락 분리. SSH(plink) 원격 관리. 코드는 `release` 브랜치 zip 전송(`git archive` → `pscp` → `Expand-Archive`). 예약작업 `SellermateUnified` 5분 반복 트리거 + 실패 시 자동 재시작. srv05는 SSH 기본 셸이 cmd라 `powershell -NoProfile -Command`로 감싸야 함.
+- **2026-08-11 수정 6건** — ①부분 로드 하한 ②플러스스토어 진입 방지 ③로그인 게이트 ④pagingIndex URL 폴백 복원 ⑤차단→재큐 ⑥차단해제+순위없음 누수 수정. 최종 성과: 30분 21건 중 20건 성공(95%), 185위까지 추출. → [[네이버-순위-계산]]
+- **CDP vs puppeteer A/B** — 차이 없음. 빈 프로필 CDP 크롬은 puppeteer와 동일하게 차단됨. 로컬에서 CDP가 잘 된 건 사람이 오래 쓴 프로필 때문이지 CDP 자체의 이점이 아니었음.
+
 ## 의존 개념: [[네이버-순위-계산]] · [[사람행동-시뮬레이션]] · [[봇탐지-우회-스택]] · [[IP-로테이션]]
