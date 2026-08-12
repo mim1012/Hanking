@@ -8,6 +8,7 @@
 ## 정본 구현 (canonical)
 - **추출·디컴파일 스크립트** — `android-decompile/extract-and-decompile.ps1:29` — `adb shell pm path` → `adb pull` → `jadx --show-bad-code --deobf`, extraction-info.txt 생성(`:42`).
 - **분석 체크리스트 템플릿** — `android-decompile/architecture-analysis-template.md:26`.
+- **경쟁앱 수동 디컴파일 사례** — `android-decompile/touchassist/apk/com.touchassist.service.apk` → `android-decompile/touchassist/jadx/sources/`, jadx 바이너리는 `android-decompile/tools/jadx-1.5.5/bin/jadx.bat` 직접 호출(스크립트가 대상 패키지 하드코딩이라 신규 패키지는 스크립트 밖에서 동일 커맨드 재현). jadx 힙 OOM(시스템 여유메모리 <1GB) 실측 — 여유 메모리 수GB 확보 후 재시도로 해결, 68클래스 파싱 에러는 있어도 99% 산출물은 정상 사용 가능. → [[project-touchassist]]
 
 ## 산출물 활용 (canonical)
 - **ViewId 레퍼런스** — `Vortex/docs/VIEW_ID_REFERENCE.md`, `docs/ViewIdlist.md` (디컴파일 APK 전체 view ID → 파싱 상수).

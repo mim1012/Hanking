@@ -12,5 +12,6 @@ KakaoT/Uber 등 앱이 접근성 자동클릭을 차단할 때. 자동 수락 �
 
 ## 다른 구현 / 변형
 - `UberAutoAccept/utils/ShizukuHelper.kt` — `input tap x y` 5탭×30ms, `FLAG_IS_GENERATED_BY_ACCESSIBILITY` 우회 (`AGENTS.md:82`).
+- `touchassist/service/ShellService.java` + `util/ShizukuHelper.java` — 시즈쿠 한 바인딩(`:shell_service` 별도 프로세스)으로 **탭 주입 + UIAutomation 직접 트리조회 + uiautomator dump 셸 실행**까지 3용도 통합. 버전 관리(`USER_SERVICE_VERSION`)로 앱 업데이트마다 UserService 갱신, 재바인딩 스토밍 방지(`duplicateConnectCount`). Vortex의 탭 전용 사용보다 심화. → [[project-touchassist]]
 
-## 관련: [[디컴파일-ViewId-자동화]] · [[State-Machine-접근성서비스]] · [[project-Vortex]] · [[project-UberAutoAccept]]
+## 관련: [[디컴파일-ViewId-자동화]] · [[State-Machine-접근성서비스]] · [[카카오T-예약콜-실시간감지]] · [[project-Vortex]] · [[project-UberAutoAccept]] · [[project-touchassist]]

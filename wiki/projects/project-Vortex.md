@@ -26,4 +26,9 @@ Supabase `twinme_accept_flow_events`(jsonb `details`)에 수락 단계별 이벤
 - **함정: created_at으로 클라 지연 측정 금지** — 배치 인제스트(45s/40건, 2.7.7)를 쓰면 서버 삽입시각이 flush 창에 양자화된다. 지연은 반드시 클라 단조시계 필드로.
 - **DB 조회 경로** — Supabase Management API `POST /v1/projects/{ref}/database/query`로 읽음(대시보드 토큰 필요). urllib 기본 UA는 Cloudflare 1010 차단 → `User-Agent: curl/8.4.0` 헤더 필요. 프로젝트 ref `czqnybgoaeihwvgdtvgn`, 리전 풀러엔 tenant 미존재(직결 대신 Management API 사용).
 
-## 의존 개념: [[Shizuku-입력주입]] · [[디컴파일-ViewId-자동화]] · [[State-Machine-접근성서비스]]
+## hawng-driver 브랜치 — vortex3 전용 + 경쟁앱(touchassist) 벤치마킹 (2026-08-12)
+브랜치 전체가 `com.example.vortex3`/"Vortex3"로 영구 리브랜딩(applicationId+앱이름, 일회성 suffix 아님). 16KB 페이지 정렬(Android 15+)은 Sentry SDK 7.3.0→8.47.0 + AGP 8.1.1→8.5.2 + Gradle 8.5→8.7 조합으로 해결(SDK만으론 불충분, `zipalign -c -P 16`으로 검증).
+- **기능 갭 분석 기준선** — [[project-touchassist]](경쟁 예약콜 자동화 앱 디컴파일) 대비 Vortex 미보유: (1) [[행정동-기반-지역필터]] "맞춤콜"(인천공항 하드코딩 키워드뿐, 일반 지역필터 없음), (2) 맞춤콜 실시간 팝업 감지→자동거절 상태머신 자체가 없음, (3) `NotificationListenerService` 채널 없음(화면꺼짐/백그라운드 콜 선감지 불가). 우선순위: 지역필터 > 알림감청 > uiautomator dump 폴백 > OCR/반경필터(낮음).
+- **비루팅 실시간감지 한계 재확인** — [[카카오T-예약콜-실시간감지]] — "요청 0" fresh 리딩(e1 리더)은 root/LSPosed 코드주입 전제라 Vortex(Shizuku=ADB shell 권한뿐)에서 재현 불가. 서버 자체가 ~3초 캐시라 화면 기반 폴링과 실질 격차는 크지 않음.
+
+## 의존 개념: [[Shizuku-입력주입]] · [[디컴파일-ViewId-자동화]] · [[State-Machine-접근성서비스]] · [[행정동-기반-지역필터]] · [[카카오T-예약콜-실시간감지]]
