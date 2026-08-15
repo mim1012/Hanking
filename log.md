@@ -2,6 +2,8 @@
 
 > 규칙: Ingest/Compile/Lint/배선 변경마다 아래에 한 줄 append. 수정·삭제 금지(append-only).
 > 형식: `- YYYY-MM-DD | 사이클 | 요약`
+- 2026-08-15 | Compile(mini) | sellermate_naver_place_all: 히스토리 저장률 0%→75-80% 복구 세션. [[캡차-차단-대응]] 갱신 — 캡차 체이닝 재시도 루프, "코드 존재≠배선" 함정, 네이버 하드차단(418) 진짜 트리거가 IP 평판이 아니라 레퍼러 없는 URL 직행이라는 발견(3개 서로 다른 IP로 실증), 배제된 접근에 "IP 로테이션만으로 해결 시도" dead-end 추가. project-sellermate_naver_place_all에 세션 메모 추가(운영코드 드리프트, 캡차솔버 미배선+API키누락, 페이지네이션 스크롤 재시도버그, 디스크누수 별개버그, RDP포커스유출, UIPI, 히스토리 -1 저장정책 변경). 앵커 전부 이번 세션 실독: ReceiptCaptchaSolver.ts:39,163,350 / parallel-rank-checker.ts:45(직접 수정).
+
 - 2026-08-08 | Ingest+Compile(mini) | starcraft_dashboard: 구글드라이브에서 숨고 외주 인수인계 프로젝트(정은석, 초월자강화기 보스클리어 OCR 대시보드) 신규 유입. cv2.imread 유니코드경로 버그 수정으로 OCR 8/8 크래시→정상, 정규식 오독보정(클리어→흘리어/처치→저치/초월석→소월석 등)으로 파싱률 개선, ttk.Style() 다크테마 적용, config 경로버그(cwd상대경로) 수정, PyInstaller onefile 빌드 시도(1차 exit0였으나 scipy._cyutility 누락으로 실행즉시크래시 실증 확인 — "빌드성공≠실행가능" 사례, --collect-all scipy로 재빌드는 세션종료 시점 미완료). 신규 concept 미승격: cv2.imread 우회/config영속화패턴 둘 다 dead-end(실패한 대안 시도) 기록이 없어 게이트3 미충족, project-starcraft-dashboard 메모로만 기록(규칙7). project-starcraft-dashboard 신규 등록, README "게임 유틸/로컬 OCR" 도메인 신설. 앵커 ocr_engine.py:14, data_manager.py:16, HANDOFF.md:1 세션 내 실독·실행(ocr_test.py 8/8, main.py 스크린샷) 검증.
 
 - 2026-07-05 | Compile | 위키 최초 생성 — raw/wiki/schema 3계층, 개념 19 · 프로젝트 23, X 사례조사 인제스트
