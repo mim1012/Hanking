@@ -164,6 +164,21 @@ mitmproxy 전수 캡처(네이버/pstatic 114건) + 헤더 에코 페이지 두 
 - **관련 dead-end**: 앱이 직접 abstract 소켓에 붙기(UID 거부), 접근성으로 크롬 DOM 읽기
   (ANR), Shizuku(수동 활성화).
 
+## 메모 — 봇 관리 admin UI 공백 + daily_target RPC 수정 (2026-08-16)
+- `server/web/admin/`엔 원래 `index.html`(그룹 전략배정)·`history.html`(실험 모니터링) 2페이지뿐이었고,
+  `server/lib/admin.js`에 이미 구현된 `adminSnapshot()`/`addAdminAccount()`/`setAdminGroupState()`/
+  `setAdminGroupCommand()`(디바이스·계정·그룹 API)를 쓰는 화면이 하나도 없었다. `devices.html` 신설로
+  연결(새 라우트 불필요, 기존 API 그대로 소비).
+- PC 플릿(Strategy A)은 Android `android_devices`와 별개 자원이라 보스/솔저 개념이 없다 — `devices.html`에
+  "PC 플릿 현황" 섹션을 별도로 추가하고 `getPcFleetStatus()`(`server/lib/admin.js`, `workerNodes` 테이블
+  조회, PC_WORKER_ONLINE_MS=900_000)로 플랫 워커 목록만 표시(보스/솔저 컬럼 없음).
+- `claim_android_naver_task` RPC에 `daily_target` 체크 추가(`supabase/migrations/20260816000000_*.sql`) —
+  상세는 [[project-adpang-production]]·[[project-turafic_update]] 참고. 실동작(daily_target 도달 슬롯이
+  실제로 클레임 안 되는지) 검증은 이 세션에서 미완 — daily_target 설정 슬롯 816개 중 도달한 게 0개(자정
+  리셋 직후)라 자연 케이스가 없었고, 큐가 `order by id`(최오래순)라 인위적 테스트 데이터로는 실제 픽업을
+  보장 못 해 무리한 테스트를 하지 않았다. 함수 배포 자체는 RPC 호출로 정상 동작 확인(claim_ttl=5초로
+  실 트래픽 영향 최소화).
+
 ## 관계
 - **모체** = [[project-naver-traffic-android-samsung]] (0.1.x 릴리스 계보, 전략 A/B/C/G/H 전체). 이 레포는 그 봇 서버 분리 파생본. 버리는 커밋도 자매 클론 + reflog에 보존.
 

@@ -17,5 +17,9 @@
 - **선언만 되고 검증 안 되는 해시** — `VersionInfo.hash`(`auto-updater.ts:29`)가 optional로 선언돼 있으나 **다운로드 무결성 검증에 전혀 안 쓰임**(trust-on-HTTPS). 공급망 관점 갭.
 - **`git reset --hard`가 로컬 변경 소실** — 원격 강제 동기라 원격 PC의 로컬 수정은 조용히 폐기됨.
 - `auto-updater.ts`와 `auto-updater-new.ts`는 바이트 동일 중복.
+- **신규 PC SSH 접속 시 키 인증이 조용히 실패할 수 있다** → [[SSH-공개키인증-Win32버그-우회]]. ACL·관리자그룹이 정상이어도 발생(PC-02, `218.148.204.120`에서 실측). plink+비밀번호로 우회.
+- **`SUPABASE_CONTROL_URL`/`SUPABASE_CONTROL_KEY` 미설정 시 heartbeat가 조용히 no-op** — `scripts/strategy-a-runner.ts:82-83` 두 변수가 없으면 `controlDb`가 `null`이 되고 `sendHeartbeat()`가 `if (!controlDb) return;`로 매번 아무것도 안 함(에러도 안 남음). `workerNodes`가 실제 가동 PC들인데도 0행이었던 원인. `workerNodes`는 프로덕션과 **같은 Supabase 프로젝트**에 있으므로(`:53-58`의 기존 PRODUCTION 폴백과 동일 패턴으로) CONTROL 변수가 없으면 PRODUCTION 값으로 자동 폴백하도록 수정(`:59-65`) — 신규 env 배포 없이 코드 배포만으로 전 PC에 해결됨.
+- **키워드 풀 정본은 `slot_naver`가 아니라 `sellermate_slot_naver`** — Supabase REST `Content-Range`로 실측(946행 vs 938행, 컬럼 구조도 다름 → 동의어/뷰 아닌 별개 물리 테이블). 실제 가동 중인 `scripts/strategy-a-runner.ts`(`:239,268`)는 `sellermate_slot_naver` + `landing_keyword_pool`을 읽는다. 접두어 없는 `slot_naver`/`traffic_navershopping`은 구 러너(`runner/production-runner.ts`) 전용이며, `traffic_navershopping`이 실측 0행이라 그 경로는 죽어있음이 확인됨. `landing_keyword_pool`은 zero-landing 전용이라던 설계문서(`zero-landing/docs/keyword-rotation-design.md`)와 달리 PC러너가 실제로 후보 필터링에 쓰고 있음(문서가 outdated).
+- **`daily_target`(일일 트래픽 한도)이 어디서도 강제되지 않던 gap** — DB 컬럼과 설정 UI(adpang-production)까지는 있는데 큐 적재/봇 클레임/PC러너 세 곳 다 참조 안 해서 무제한 처리됐음. PC 쪽은 `acquireMultipleSlots()`(`scripts/strategy-a-runner.ts:337-344` 부근) 슬롯 조회에 `success_count < daily_target` 필터 추가로 수정(성공수만 카운트, 실패는 한도에 미포함). Android 쪽은 `claim_android_naver_task` RPC에 동일 조건 추가 필요 → [[project-naver_turafic_samsung]].
 
-## 의존 개념: [[앱-자동업데이트-채널]] · [[봇탐지-우회-스택]]
+## 의존 개념: [[앱-자동업데이트-채널]] · [[봇탐지-우회-스택]] · [[SSH-공개키인증-Win32버그-우회]]
