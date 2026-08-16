@@ -16,7 +16,13 @@
   `whoami` 정상 응답 확인 — 독립된 두 번째 실동작 검증).
 
 ## 다른 구현 / 변형
-(없음 — 지금까지 발견된 유일한 실동작 경로가 plink+비밀번호)
+- **서버(inbound)뿐 아니라 클라이언트(outbound)에서도 재현** —
+  `turafic_update`(round-penguin worktree) PC-04(`118.32.34.247`)에서, 원격 PC가 SSH 배포키로
+  `git@github.com`에 나가는 방향에서 동일 증상(`Server accepts key: ... explicit` 로그 직후
+  응답 없이 멈춤, `ssh -vT git@github.com`이 타임아웃)이 재현됨 — `PC-INVENTORY.md:43`. 서버 설정
+  문제가 아니라 이 PC들에 깔린 Win32-OpenSSH 클라이언트/서버 공통 버전대의 버그임을 시사. 우회는
+  SSH 키 자체를 포기하고 GitHub PAT를 `https://<PAT>@github.com/...` 형태로 `git remote set-url`에
+  임베드하는 방식(HTTPS 인증으로 완전히 회피) — `PC-INVENTORY.md:42-44`.
 
 ## 주의점 / 함정
 - **"키 인식 후 거부" 증상** — `ssh -v` 로그에 `Server accepts key: ... ED25519 ... explicit`까지

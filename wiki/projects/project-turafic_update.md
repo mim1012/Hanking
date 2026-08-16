@@ -22,4 +22,25 @@
 - **키워드 풀 정본은 `slot_naver`가 아니라 `sellermate_slot_naver`** — Supabase REST `Content-Range`로 실측(946행 vs 938행, 컬럼 구조도 다름 → 동의어/뷰 아닌 별개 물리 테이블). 실제 가동 중인 `scripts/strategy-a-runner.ts`(`:239,268`)는 `sellermate_slot_naver` + `landing_keyword_pool`을 읽는다. 접두어 없는 `slot_naver`/`traffic_navershopping`은 구 러너(`runner/production-runner.ts`) 전용이며, `traffic_navershopping`이 실측 0행이라 그 경로는 죽어있음이 확인됨. `landing_keyword_pool`은 zero-landing 전용이라던 설계문서(`zero-landing/docs/keyword-rotation-design.md`)와 달리 PC러너가 실제로 후보 필터링에 쓰고 있음(문서가 outdated).
 - **`daily_target`(일일 트래픽 한도)이 어디서도 강제되지 않던 gap** — DB 컬럼과 설정 UI(adpang-production)까지는 있는데 큐 적재/봇 클레임/PC러너 세 곳 다 참조 안 해서 무제한 처리됐음. PC 쪽은 `acquireMultipleSlots()`(`scripts/strategy-a-runner.ts:337-344` 부근) 슬롯 조회에 `success_count < daily_target` 필터 추가로 수정(성공수만 카운트, 실패는 한도에 미포함). Android 쪽은 `claim_android_naver_task` RPC에 동일 조건 추가 필요 → [[project-naver_turafic_samsung]].
 
-## 의존 개념: [[앱-자동업데이트-채널]] · [[봇탐지-우회-스택]] · [[SSH-공개키인증-Win32버그-우회]]
+- **헤드리스 데몬 `schtasks`는 `/IT` 쓰면 안 된다** → [[Windows예약작업-IT트리거-로그오프함정]].
+  `/sc onlogon ... /IT`로 등록한 원격 PC 데몬(`--headless` 브라우저 자동화)이 RDP 세션 로그오프 후
+  트리거 자체가 무반응이 되는 걸 PC-05(`220.121.252.178`)에서 실측. `/sc onstart /ru <계정>
+  /rp <비번>`으로 교체해야 로그인 여부 무관하게 재시작됨. PC-03/04/05/06 전체 재등록.
+- **GitHub PAT를 `git remote`에 임베드해 무인 자동갱신** → [[윈도우서버-git-자동배포]] 패턴 재사용.
+  SSH 배포키가 [[SSH-공개키인증-Win32버그-우회]] 때문에 이 PC들에서 안 통해서, HTTPS+PAT
+  URL로 우회. 이번엔 `sellermate_naver_place_all`처럼 fine-grained/repo한정 PAT를 처음부터
+  쓰지 않고 broad PAT를 대화창으로 전달받아 급하게 적용함 — 세션 종료 후 폐기·재발급 필요(보안
+  트레이드오프를 사후에 인지한 사례로 기록).
+- **Windows 컴포넌트 저장소 손상 PC는 `Add-WindowsCapability`(OpenSSH 기능 설치)가 막힌다** —
+  PC-06에서 `DISM /Online /Cleanup-Image /ScanHealth`가 4.9%에서 오류1009(레지스트리 손상)로
+  실패. DISM/SFC 복구 대신 [Win32-OpenSSH GitHub 릴리즈 zip](https://github.com/PowerShell/Win32-OpenSSH/releases)을
+  받아 `install-sshd.ps1`로 수동 설치하는 우회로 SSH만 살림(OS 손상 자체는 미해결로 남김).
+- **한글 Windows 계정명은 plink/SSH 인증이 거부될 수 있다**(유니코드 정규화 NFC/NFD 불일치 추정)
+  — PC-06 원래 계정 `컴맛집`으로는 비밀번호가 맞아도 `Configured password was not accepted`.
+  영문 계정(`net user sellermate ... /add` + `net localgroup Administrators sellermate /add`)을
+  새로 만들어 그걸로 접속하는 게 가장 빠른 우회.
+- **다른 Windows 계정이 소유한 git 저장소는 `dubious ownership`으로 막힌다** — 배포 시 사용한
+  계정과 SSH 접속 계정이 다르면(PC-06: `컴맛집`이 clone, `sellermate`로 접속) git이 소유권 불일치로
+  전 명령을 거부. `git config --global --add safe.directory <경로>`로 해결.
+
+## 의존 개념: [[앱-자동업데이트-채널]] · [[봇탐지-우회-스택]] · [[SSH-공개키인증-Win32버그-우회]] · [[Windows예약작업-IT트리거-로그오프함정]] · [[윈도우서버-git-자동배포]]
