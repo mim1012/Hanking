@@ -10,6 +10,7 @@
 
 ## 사용법 (4사이클)
 - **Query** — "네이버 순위 어디 있어?" → [[네이버-순위-계산]] → canonical `파일:줄`
+- **검증 완료 게이트** — 순위·자동화는 모바일/웹 모두 정본 history 적재 후 read-back 대조가 끝나야 완료로 판정 → [[골든플로우-실구동-게이트]]
 - **Ingest** — 새 프로젝트 스캔: Claude에게 "`/ingest <프로젝트명>`" (스키마는 [AGENTS.md](AGENTS.md) — CLAUDE.md는 @포인터)
 - **Compile** — 스캔 결과를 concept/project 페이지로 생성
 - **Lint** — 죽은 링크·오래된 `파일:줄` 점검: `python -X utf8 scripts/lint.py` (2026-07-05 첫 실행: 87/87 유효)

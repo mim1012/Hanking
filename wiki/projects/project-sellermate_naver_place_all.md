@@ -11,9 +11,11 @@
 - `rank-check/parallel/parallel-rank-checker.ts:220,404,469` — 쇼핑탭 SPA 페이지 전환(스크롤→PointerEvent dispatch→3중 검증). → [[네이버-순위-계산]]
 - `rank-check/parallel/parallel-rank-checker.ts:36` — `isTransientBrowserError`: CDP 일시 장애(session/target closed, ENOSPC 등) 판별 후 재큐. 영구 실패와 구분해 데이터 오염 방지.
 - `rank-check/utils/recover-stale-keyword-locks.ts` — 죽은 PC가 잡은 `assigned_to` 락 회수. 큐 방식 분산 워커의 필수 짝. → [[project-adpang-production]] 슬롯 락과 같은 계열.
+- `rank-check/test/_check-history-continuity.ts:29-82` — 정본 history를 재조회해 최근 적재 건수·고유 슬롯·최신 샘플을 대조하는 완료 검증 게이트. 모바일·웹 공통 기준. → [[골든플로우-실구동-게이트]]
 
 ## 세션 메모
 - **2026-08-16 git 자동배포 전환** — 4대 서버(SRV-01~04) 배포를 SFTP 수동에서 push→5분 자동 반영으로 전환. 상세 패턴·함정·앵커는 [[윈도우서버-git-자동배포]]. 같은 날 keyword+url 그룹핑(검색 1회→활성 슬롯 전체 팬아웃 저장, `rank-check/utils/resolve-naver-slot-members.ts`)과 광고 제외 오가닉 순위([[네이버-순위-계산]] organic_expose_order 섹션)도 배포됨.
+- **2026-08-17 완료 기준 고정** — 모바일/웹 모두 프로세스·heartbeat·큐·로그가 아니라 정본 history 실제 적재와 저장 직후 read-back 대조가 확인된 경우에만 검증 완료로 선언한다. 미확인 시 실패/미완료로 보고한다. 상세 기준은 [[골든플로우-실구동-게이트]].
 - **2026-08-08 병합** — 텔레그램 zip(서버 08_07본)과 로컬 `feat/place-exe-fix`가 갈라져 있었다. zip=순위 로직 최신, 로컬=exe 패키징 최신. zip 15파일을 정본으로 받고 로컬 3개(browser-eval 인라인 주입, git-sync `GIT_REMOTE`, `SKIP_SUPABASE_CHECK`)만 지켰다. 커밋 `a096874`.
 - **차단 시 삭제 금지** — `rank-check/batch/check-batch-keywords.ts:52` `MAX_BLOCK_RETRIES`(기본 2). 구버전은 캡차 한 번에 `rank=-1`을 히스토리에 박고 큐에서 삭제해 그날 데이터를 오염시켰다.
 - **캡차의 실제 구멍은 코드가 아니라 IP 로테이션** — 예방 코드(`isBlocked`, `BLOCK_THRESHOLD=3`)는 두 갈래가 동일했다. ADB 테더링 기기가 없으면 `rotateIP()`가 `스킵(disabled 또는 기기 없음)`으로 빠져 3연속 차단에도 IP가 안 바뀐다.
@@ -37,4 +39,4 @@
   - **SFTP "Failure"(원인불명)는 디스크풀 신호일 확률 높음**: 작은 파일 성공·큰 파일만 실패 패턴으로 빠르게 isolate 가능.
   - 최종 성과: 저장 성공률 0% → 배포 직후 과도기 거쳐 75-80%로 안정화(라이브 확인).
 
-## 의존 개념: [[네이버-순위-계산]] · [[사람행동-시뮬레이션]] · [[봇탐지-우회-스택]] · [[IP-로테이션]] · [[캡차-차단-대응]]
+## 의존 개념: [[네이버-순위-계산]] · [[골든플로우-실구동-게이트]] · [[사람행동-시뮬레이션]] · [[봇탐지-우회-스택]] · [[IP-로테이션]] · [[캡차-차단-대응]]
