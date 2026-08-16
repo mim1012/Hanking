@@ -38,6 +38,13 @@
   한다 — 이 함정에 실제로 걸려 첫 plink 인증이 "Configured password was not accepted"로
   실패했었다.
 
+## 다른 구현 / 변형 (scp 파일 배포)
+- **같은 PC 플릿에서 `scp`(SFTP 서브시스템 기반) 목적지 경로에 `C:\sellermate\...`처럼 백슬래시를
+  쓰면 조용히 실패한다** — 종료코드 0, `-v`에도 에러 없이 "truncating at N"만 찍혀 정상처럼 보이지만
+  원격 파일은 갱신되지 않는다(구버전 그대로 남음). `C:/sellermate/...`로 슬래시만 바꾸면 즉시 정상
+  반영됨(grep으로 재확인) — `turafic_update`(round-penguin worktree) sellermate-01(SSH 키 인증)에서
+  재현·수정, 상세: `PC-INVENTORY.md:61`.
+
 ## 배제된 접근 (dead-end)
 - **ACL 재설정**(`icacls /inheritance:r` + `/grant:r`) — 폴더 상속 권한이 안 지워진 게 원인일
   거라 가정하고 재확인했으나, 이미 SYSTEM+Administrators만 있는 정상 상태였다. ACL은 원인이
