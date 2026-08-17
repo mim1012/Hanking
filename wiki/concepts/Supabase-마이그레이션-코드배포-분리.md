@@ -65,6 +65,14 @@ Vercel(또는 다른 서버리스) + Supabase 조합에서 "컬럼 추가 + 그 
   Connection Pooling 탭에서 정확한 Session Pooler 문자열을 사용자에게 직접 받을 것 — 추측 재시도
   금지(스톱-리트라잉 원칙).
 
+## 2026-08-17 재검증 결과
+
+이 프로젝트의 `SUPABASE_DB_URL`은 direct IPv6 URL이었지만, GitHub Actions runner에서
+`aws-1-ap-northeast-2.pooler.supabase.com:5432`로 연결하는 후보 경로가 실제로 성공했다.
+`aws-0` 후보는 `tenant/user not found`였으므로 pooler 세대/샤드 prefix도 실제 동작 로그로
+검증해야 한다. 그래도 일반화된 정본은 여전히 Supabase Dashboard의 Session Pooler 연결
+문자열을 secret에 그대로 저장하는 방식이다.
+
 ## 검증된 성공
 
 마이그레이션(대시보드 실행) + 코드(PR #51 머지 → Vercel 자동 재배포) 둘 다 완료된 뒤, 실기기(z1-1)
