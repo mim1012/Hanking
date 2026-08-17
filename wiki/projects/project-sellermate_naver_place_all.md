@@ -17,6 +17,11 @@
 - `rank-check/test/_check-history-continuity.ts:29-82` — 정본 history를 재조회해 최근 적재 건수·고유 슬롯·최신 샘플을 대조하는 완료 검증 게이트. 모바일·웹 공통 기준. → [[골든플로우-실구동-게이트]]
 
 ## 세션 메모
+- **2026-08-17 오후 카나리→4대 승격 + 미발견 정책 확정** — SRV-01 카나리(성공 3회+read-back 그린) 후 push 승격, 최종 d9eb0f2. 핵심 교훈 3개:
+  - **무조건 reset 자동배포 위 카나리 절차**(동기화 Disable→SFTP→그린 게이트→push→Enable)는 [[윈도우서버-git-자동배포]]에 등재.
+  - **외부 리필러가 있는 큐엔 큐 행 마커가 무력** — 웹 스케줄러가 시간대마다 큐를 새 행으로 재적재해 쿨다운·주차(-1) 마커를 지움. 해법: 리필러가 안 건드리는 테이블(슬롯 `current_rank=-1`+당일 updated_at)에 마커 + 러너 청소기가 리필 부활분을 검색 없이 삭제. `rank-check/batch/check-batch-keywords.ts:168`(deleteNotFoundGroup)·`:191`(sweepNotFoundQueueRows), 백필 제외는 `rank-check/utils/coverage-backfill.ts`.
+  - **주입 스크립트 TS 문법 누출 재발** — evaluateString 백틱 문자열 안 `as HTMLElement`가 브라우저 SyntaxError를 내고, 그 에러가 "영구 추출실패"로 오분류돼 큐 부당 삭제까지 이어짐(place-exe evaluate 직렬화 교훈의 변종). 수정: 순수JS화(`parallel-rank-checker.ts:1066` 인근) + 영구실패는 명시 메시지 3종만 + 미발견 확정은 깨끗한 15p 완주만.
+  - 부속: 전략/변형 키워드가 슬롯 본래 키워드의 current_rank를 덮지 않게 가드(`rank-check/utils/save-rank-to-slot-naver.ts:171-196` isForeignKeyword — 히스토리만 적재). 차단 웨이브 완화는 코드가 아니라 요청 밀도(라운드 간격 3→60초)로.
 - **2026-08-16 git 자동배포 전환** — 4대 서버(SRV-01~04) 배포를 SFTP 수동에서 push→5분 자동 반영으로 전환. 상세 패턴·함정·앵커는 [[윈도우서버-git-자동배포]]. 같은 날 keyword+url 그룹핑(검색 1회→활성 슬롯 전체 팬아웃 저장, `rank-check/utils/resolve-naver-slot-members.ts`)과 광고 제외 오가닉 순위([[네이버-순위-계산]] organic_expose_order 섹션)도 배포됨.
 - **2026-08-17 완료 기준 고정** — 모바일/웹 모두 프로세스·heartbeat·큐·로그가 아니라 정본 history 실제 적재와 저장 직후 read-back 대조가 확인된 경우에만 검증 완료로 선언한다. 미확인 시 실패/미완료로 보고한다. 상세 기준은 [[골든플로우-실구동-게이트]].
 - **2026-08-17 keyword+URL 중복 슬롯 보강** — `resolve-naver-slot-members.ts`의 canonical 키와 `check-batch-keywords.ts`의 그룹 claim/fan-out을 연결해 query/fragment/trailing slash 차이를 같은 그룹으로 묶고, 동일 `slot_id`는 1회만 저장한다. 양수 순위는 슬롯별 history coverage가 전부 확인될 때만 큐를 지운다. 로컬 회귀 통과 후 live `--once` 1사이클에서 history 총량 304→309건 증가, 독립 최근 양수행 read-back 10/10 일치, 최근 30분 중복 클러스터 0개를 확인했다.

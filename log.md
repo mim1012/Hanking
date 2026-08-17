@@ -103,3 +103,4 @@
 - 2026-08-17 | Compile/교훈 | sellermate_naver_place_all: 6시간 커버리지 감사 결과를 project/네이버-순위-계산에 반영 — 실제 처리 대상 189개(명목 활성 254개에서 만료·마스터 비활성 65개 제외), 6시간 양수 history 153개, 일일 게이트로 숨은 stale 22개, 큐 잔류 14개. 최신순 재시도 hot-loop와 telemetry-success/history 불일치를 운영 함정으로 기록. 신규 concept 미승격(수정 성공 검증 전).
 - 2026-08-17 | Compile/교훈 | turafic_update: FleetAgent 설치가 `New-NetFirewallRule Enabled=$true` enum 바인딩에서 실패한 재현을 project 페이지에 기록. `-WhatIf` 바인딩 검증 및 기본 enabled 인자 생략을 다음 재설치 전제조건으로 남겼으며 대상 PC 재설치 성공 전까지 concept 승격하지 않음.
 - 2026-08-17 | Compile/교훈 | 기존 Android 플릿 세션 메모를 sellermate 프로젝트 페이지에 통합 — 17:32 KST `NO_HISTORY` 마감, ADB 단절·NOT_FOUND_SUSPECT·NAVER_BLOCKED 분리, `DEVICE_OFFLINE` 자기 로그 재수집에 따른 phantom serial 방지 교훈을 기록.
+- 2026-08-17 Compile(sellermate): 카나리↔무조건reset 자동배포 절차를 [[윈도우서버-git-자동배포]]에, 외부리필러 큐 마커·주입스크립트 as누출·전략키워드 가드를 project-sellermate 세션메모에 등재 (앵커 실독 검증)

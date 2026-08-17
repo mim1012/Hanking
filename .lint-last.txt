@@ -1,22 +1,48 @@
-﻿# lint ?먮룞 ?ㅽ뻾 (二쇨컙 ?ㅼ?以? ??2026-08-10 10:00
+﻿# lint ?먮룞 ?ㅽ뻾 (二쇨컙 ?ㅼ?以? ??2026-08-17 10:00
 
-pages: 97 (concepts 42, projects 41)
+pages: 106 (concepts 50, projects 42)
 
-DEAD LINKS: 2
+DEAD LINKS: 3
   wiki\concepts\Flutter-DartAOT-Blutter?뺤쟻蹂듭썝.md -> [[kali-migration]]
   wiki\concepts\Flutter-DartAOT-Blutter?뺤쟻蹂듭썝.md -> [[kali-migration]]
+  wiki\projects\project-turafic_update.md -> [[naver-login-redirect-hypothesis]]
 
 ORPHANS (no inbound links): 0
 
-FILE:LINE refs checked: 240, stale: 0
+FILE:LINE refs checked: 251, stale: 21
+  wiki\concepts\?붿뺨?뚯씪-ViewId-?먮룞??md -> turafic/src/frida/hook_signature_functions.js:24 (file missing)
+  wiki\concepts\由ъ뒪??愿由??곹깭湲곌퀎.md -> mt5/indicators/bollinger.py:5 (file missing)
+  wiki\concepts\遊뉙깘吏-?고쉶-?ㅽ깮.md -> zero-android-optionc/app/src/main/java/com/zero/traffic/service/TrafficService.java:300 (file missing)
+  wiki\concepts\釉뚮씪?곗?-?몄뀡荑좏궎-?곸냽??md -> ?곕젅??由ы룷?ㅽ듃 ?щ·留?threads_crawler.py:13 (file missing)
+  wiki\concepts\釉뚮씪?곗?-?몄뀡荑좏궎-?곸냽??md -> sinsang/src/services/browser_manager.py:124 (file missing)
+  wiki\concepts\罹≪감-李⑤떒-???md -> somae-collector/src/services/browser_manager.py:145 (file missing)
+  wiki\projects\project-kmong.md -> scripts/kmong_probe_with_profile.py:23 (file missing)
+  wiki\projects\project-kmong.md -> scripts/kmong_finalize_proof_service_cdp.py:108 (file missing)
+  wiki\projects\project-kmong.md -> scripts/kmong_finalize_proof_service_cdp.py:56 (file missing)
+  wiki\projects\project-kmong.md -> scripts/cdp_capture_current_page.py:23 (file missing)
+  wiki\projects\project-kmong.md -> src/kmong_auto/assets.py:15 (file missing)
+  wiki\projects\project-kmong.md -> scripts/g2b_prepare_it_vendor_pack.py:25 (file missing)
+  wiki\projects\project-mt5.md -> indicators/bollinger.py:5 (file missing)
+  wiki\projects\project-naver_turafic_samsung.md -> zero-android-optionc/app/src/main/java/com/zero/traffic/engine/ActionExecutor.java:1288 (file missing)
+  wiki\projects\project-sinsang.md -> src/services/browser_manager.py:70 (file missing)
+  wiki\projects\project-sinsang.md -> src/services/browser_manager.py:36 (file missing)
+  wiki\projects\project-sinsang.md -> src/services/picwish_service.py:52 (file missing)
+  wiki\projects\project-sinsang.md -> src/collector/image_downloader.py:24 (file missing)
+  wiki\projects\project-sinsang.md -> src/collector/top30_collector.py:43 (file missing)
+  wiki\projects\project-turafic.md -> src/frida/hook_signature_functions.js:24 (file missing)
+  wiki\projects\project-turafic_update.md -> scripts/strategy-a-runner.ts:79 (file missing)
 
-log.md issues: 6
-  line 7: ?좎쭨 ??닚 (2026-07-05 < 2026-08-08)
-  line 41: ?뺤떇 遺덉씪移?(`- YYYY-MM-DD | ?ъ씠??| ?붿빟`)
-  line 42: ?뺤떇 遺덉씪移?(`- YYYY-MM-DD | ?ъ씠??| ?붿빟`)
-  line 48: ?뺤떇 遺덉씪移?(`- YYYY-MM-DD | ?ъ씠??| ?붿빟`)
-  line 49: ?뺤떇 遺덉씪移?(`- YYYY-MM-DD | ?ъ씠??| ?붿빟`)
-  line 63: ?뺤떇 遺덉씪移?(`- YYYY-MM-DD | ?ъ씠??| ?붿빟`)
+log.md issues: 10
+  line 8: ?좎쭨 ??닚 (2026-08-15 < 2026-08-16)
+  line 10: ?좎쭨 ??닚 (2026-08-08 < 2026-08-15)
+  line 12: ?좎쭨 ??닚 (2026-07-05 < 2026-08-08)
+  line 46: ?뺤떇 遺덉씪移?(`- YYYY-MM-DD | ?ъ씠??| ?붿빟`)
+  line 47: ?뺤떇 遺덉씪移?(`- YYYY-MM-DD | ?ъ씠??| ?붿빟`)
+  line 53: ?뺤떇 遺덉씪移?(`- YYYY-MM-DD | ?ъ씠??| ?붿빟`)
+  line 54: ?뺤떇 遺덉씪移?(`- YYYY-MM-DD | ?ъ씠??| ?붿빟`)
+  line 68: ?뺤떇 遺덉씪移?(`- YYYY-MM-DD | ?ъ씠??| ?붿빟`)
+  line 94: ?뺤떇 遺덉씪移?(`- YYYY-MM-DD | ?ъ씠??| ?붿빟`)
+  line 95: ?뺤떇 遺덉씪移?(`- YYYY-MM-DD | ?ъ씠??| ?붿빟`)
 
-README counts: 媛쒕뀗 42/42, ?꾨줈?앺듃 41/41 -> OK
+README counts: 媛쒕뀗 50/50, ?꾨줈?앺듃 42/42 -> OK
 
