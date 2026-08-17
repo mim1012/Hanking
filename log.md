@@ -104,3 +104,4 @@
 - 2026-08-17 | Compile/교훈 | turafic_update: FleetAgent 설치가 `New-NetFirewallRule Enabled=$true` enum 바인딩에서 실패한 재현을 project 페이지에 기록. `-WhatIf` 바인딩 검증 및 기본 enabled 인자 생략을 다음 재설치 전제조건으로 남겼으며 대상 PC 재설치 성공 전까지 concept 승격하지 않음.
 - 2026-08-17 | Compile/교훈 | 기존 Android 플릿 세션 메모를 sellermate 프로젝트 페이지에 통합 — 17:32 KST `NO_HISTORY` 마감, ADB 단절·NOT_FOUND_SUSPECT·NAVER_BLOCKED 분리, `DEVICE_OFFLINE` 자기 로그 재수집에 따른 phantom serial 방지 교훈을 기록.
 - 2026-08-17 | Compile | sellermate: 카나리-무조건reset 자동배포 절차를 윈도우서버-git-자동배포에, 외부리필러 큐 마커·주입스크립트 as누출·전략키워드 가드를 project-sellermate 세션메모에 등재 (앵커 실독 검증)
+- 2026-08-18 | Compile | sellermate: samsung 격차 보완(publish 턴키화·OTA 6h→10분·v0.2.5 배포 read-back) + rankchecker 릴리스 키스토어 3중 custody(SHA256 0E059D8B… 실측 일치)를 앱-자동업데이트-채널 concept와 project 페이지에 등재. auto_revive RPC는 앱 폴링 신설 필요로 보류 명시.
