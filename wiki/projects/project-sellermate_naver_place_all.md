@@ -11,11 +11,15 @@
 - `rank-check/parallel/parallel-rank-checker.ts:220,404,469` — 쇼핑탭 SPA 페이지 전환(스크롤→PointerEvent dispatch→3중 검증). → [[네이버-순위-계산]]
 - `rank-check/parallel/parallel-rank-checker.ts:36` — `isTransientBrowserError`: CDP 일시 장애(session/target closed, ENOSPC 등) 판별 후 재큐. 영구 실패와 구분해 데이터 오염 방지.
 - `rank-check/utils/recover-stale-keyword-locks.ts` — 죽은 PC가 잡은 `assigned_to` 락 회수. 큐 방식 분산 워커의 필수 짝. → [[project-adpang-production]] 슬롯 락과 같은 계열.
+- `rank-check/utils/resolve-naver-slot-members.ts:33-76,113-173` — 키워드 trim/lowercase + URL query/fragment/trailing-slash 정규화로 canonical `keyword+url` 키를 만들고, 활성 슬롯을 1000행 페이지 단위로 복원한다. `uniqueNaverSlotMembers`/`missingNaverSlotIds`가 동일 `slot_id` 중복 저장과 coverage 누락을 제거한다.
+- `rank-check/batch/check-batch-keywords.ts:210-311,693-790` — 큐의 keyword+URL 그룹을 동일 정본 키로 claim/fan-out하고, 양수 순위 결과는 기대 슬롯 전부가 정본 history에 최근 존재하며 read-back된 경우에만 큐를 삭제한다. 조회/저장/read-back 실패는 그룹 전체를 재큐한다.
+- `rank-check/utils/save-rank-to-slot-naver.ts:279-363` — history INSERT의 반환 `id`를 받은 뒤 별도 SELECT로 `slot_status_id/current_rank`를 대조하는 웹 저장 정본. `historyVerified=false`이면 호출자가 성공 처리하지 못한다.
 - `rank-check/test/_check-history-continuity.ts:29-82` — 정본 history를 재조회해 최근 적재 건수·고유 슬롯·최신 샘플을 대조하는 완료 검증 게이트. 모바일·웹 공통 기준. → [[골든플로우-실구동-게이트]]
 
 ## 세션 메모
 - **2026-08-16 git 자동배포 전환** — 4대 서버(SRV-01~04) 배포를 SFTP 수동에서 push→5분 자동 반영으로 전환. 상세 패턴·함정·앵커는 [[윈도우서버-git-자동배포]]. 같은 날 keyword+url 그룹핑(검색 1회→활성 슬롯 전체 팬아웃 저장, `rank-check/utils/resolve-naver-slot-members.ts`)과 광고 제외 오가닉 순위([[네이버-순위-계산]] organic_expose_order 섹션)도 배포됨.
 - **2026-08-17 완료 기준 고정** — 모바일/웹 모두 프로세스·heartbeat·큐·로그가 아니라 정본 history 실제 적재와 저장 직후 read-back 대조가 확인된 경우에만 검증 완료로 선언한다. 미확인 시 실패/미완료로 보고한다. 상세 기준은 [[골든플로우-실구동-게이트]].
+- **2026-08-17 keyword+URL 중복 슬롯 보강** — `resolve-naver-slot-members.ts`의 canonical 키와 `check-batch-keywords.ts`의 그룹 claim/fan-out을 연결해 query/fragment/trailing slash 차이를 같은 그룹으로 묶고, 동일 `slot_id`는 1회만 저장한다. 양수 순위는 슬롯별 history coverage가 전부 확인될 때만 큐를 지운다. 로컬 회귀 통과 후 live `--once` 1사이클에서 history 총량 304→309건 증가, 독립 최근 양수행 read-back 10/10 일치, 최근 30분 중복 클러스터 0개를 확인했다.
 - **2026-08-08 병합** — 텔레그램 zip(서버 08_07본)과 로컬 `feat/place-exe-fix`가 갈라져 있었다. zip=순위 로직 최신, 로컬=exe 패키징 최신. zip 15파일을 정본으로 받고 로컬 3개(browser-eval 인라인 주입, git-sync `GIT_REMOTE`, `SKIP_SUPABASE_CHECK`)만 지켰다. 커밋 `a096874`.
 - **차단 시 삭제 금지** — `rank-check/batch/check-batch-keywords.ts:52` `MAX_BLOCK_RETRIES`(기본 2). 구버전은 캡차 한 번에 `rank=-1`을 히스토리에 박고 큐에서 삭제해 그날 데이터를 오염시켰다.
 - **캡차의 실제 구멍은 코드가 아니라 IP 로테이션** — 예방 코드(`isBlocked`, `BLOCK_THRESHOLD=3`)는 두 갈래가 동일했다. ADB 테더링 기기가 없으면 `rotateIP()`가 `스킵(disabled 또는 기기 없음)`으로 빠져 3연속 차단에도 IP가 안 바뀐다.
@@ -40,3 +44,10 @@
   - 최종 성과: 저장 성공률 0% → 배포 직후 과도기 거쳐 75-80%로 안정화(라이브 확인).
 
 ## 의존 개념: [[네이버-순위-계산]] · [[골든플로우-실구동-게이트]] · [[사람행동-시뮬레이션]] · [[봇탐지-우회-스택]] · [[IP-로테이션]] · [[캡차-차단-대응]]
+
+- **2026-08-17 Android 5p 운영 고정** — `rank-check/android-app/app/src/main/java/com/navertraffic/rankchecker/NaverBrowser.kt`의 동일-origin API 페이지네이션(`pagingIndex`)과 페이지 간 1.8~2.7초 지연을 정본으로 사용한다. 최대 10페이지, 차단은 `BLOCKED`, 미발견은 즉시 재요청하지 않고 5분 후 재검증한다. `rank-check/android-app/app/src/main/java/com/navertraffic/rankchecker/SupabaseApi.kt:97-156`은 history POST 반환행과 별도 GET read-back이 모두 맞을 때만 큐를 삭제한다. `rank-check/android-monitor/monitor-rankchecker.ps1` 및 작업 스케줄러 `SellermateRankcheckerAdbMonitor`가 ADB 3대의 새 로그와 DB 큐/history를 10분마다 감시한다. 2026-08-17 실측: 세 기기 online=True, `history_15m=1`, `positive=1`, `invalid_rank=0`, alerts 0.
+- **2026-08-17 rankchecker 100대 운영 기반** — `rank-check/supabase/migrations/20260817000000_rankchecker_fleet_telemetry.sql`에 Samsung과 분리된 `rankchecker_devices`·`rankchecker_heartbeats`·`rankchecker_job_runs`·`rankchecker_alerts`·`rankchecker_releases`를 추가했다. APK는 60초 heartbeat와 작업 실행 telemetry를 직접 기록하고, `monitor-rankchecker.ps1`은 ADB 자동 discovery·오프라인 registry·30분 Telegram dedupe·stale heartbeat 감시를 수행한다. 실기기에서 APK heartbeat 경로가 실제 Supabase에 도달했으나 마이그레이션 미적용으로 `PGRST205/404`가 반환되어, SQL 적용 전에는 telemetry/OTA가 운영 완료가 아니다. `publish-rankchecker-release.mjs`는 release 서명 APK를 Storage에 올리고 rankchecker 채널 릴리스를 canary 대기 상태로 등록한다.
+
+- **2026-08-17 6시간 커버리지 불균형 원인 확정** — 단순 `status=작동중` 슬롯 254개 중 실제 백필 조건(만료되지 않음 + `sellermate_slots` 마스터 active/작동중 + 유효 URL)을 만족하는 처리 대상은 189개였다. 65개는 만료 또는 마스터 비활성이라 운영 대상 집계에서 분리해야 한다. 처리 대상 189개 중 최근 6시간 양수 history는 153개, 오늘 자정 이후 history는 있으나 6시간 내 기록이 없는 슬롯은 22개, 큐에 남은 슬롯은 14개였다. `coverage-backfill.ts:103-108`이 6시간이 아니라 오늘 자정부터의 history만 조회하므로, 22개가 6시간 SLA 대상에서 조용히 제외된다.
+- **재시도 hot-loop 교훈** — PC `check-batch-keywords.ts:377`와 Android `SupabaseApi.kt:29`가 모두 `last_check_date DESC`로 최신 재시도 작업을 먼저 선택한다. 최근 20개 Android job 중 16개가 동일한 `NOT_FOUND_SUSPECT` 작업의 반복이었고, 세 기기 모두 마지막 상태가 `ERROR`였다. 미발견 의심 작업을 5분 후 반환하는 정책 자체는 -1 오염을 막지만, 최신순 정렬과 결합하면 새 슬롯을 굶기는 큐 독점이 된다. 미발견 쿨다운, 시도 횟수/다음 시각, 공정한 FIFO 또는 별도 retry lane이 함께 필요하다.
+- **운영 집계 교훈** — worker heartbeat/job telemetry와 PC event success는 처리 신호일 뿐 history 성공 증거가 아니다. 60분 모니터에서 history는 31건 양수였지만 Android job은 성공 13/실패 28, PC event에는 `success_without_history`가 164건 있었다. 슬롯별 커버리지·history read-back·큐 상태를 같은 창에서 조인해 판정해야 한다. → [[골든플로우-실구동-게이트]]
