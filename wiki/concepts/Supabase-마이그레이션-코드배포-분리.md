@@ -79,4 +79,15 @@ Vercel(또는 다른 서버리스) + Supabase 조합에서 "컬럼 추가 + 그 
 리포트에서 `actual_persona="CHROME"`, `actual_chromium_major="138"`이 DB에 정상 저장되는 것을
 `android_task_leases` REST 조회로 확인함(연속 10건 이상, null 아님).
 
-## 관련: [[검증리그-데이터형태-재현]] · [[project-adpang-production]] · [[project-naver_turafic_samsung]]
+## 2026-08-18 재사용 — 운영 스키마 read-only 추출에도 같은 pooler 호스트
+
+같은 `aws-1-ap-northeast-2.pooler.supabase.com:5432`(`postgres.<ref>:<password>@...`)로 `pg`
+npm 패키지 직접 연결이 이번엔 **스키마 읽기 전용**(마이그레이션 실행이 아니라 `information_schema`/
+`pg_catalog` 조회) 목적으로도 그대로 성공. `pg_dump` 바이너리가 로컬에 없는 환경이라, `SET
+default_transaction_read_only = on` 세션 + `information_schema.columns`/`pg_indexes`/
+`pg_get_functiondef()`로 테이블·인덱스·함수 DDL을 코드로 재구성해 별도 스테이징 프로젝트에
+복제(→ [[project-adpang-production]] "5,000슬롯 스케일 회귀" 항목). **일반화**: 이 프로젝트에서
+`pg` 직접 연결이 필요하면 리전을 추측하지 말고 이 페이지에 이미 검증된 `aws-1-ap-northeast-2`
+호스트부터 시도할 것 — 마이그레이션 적용이든 스키마 읽기든 같은 연결 정보가 재사용된다.
+
+## 관련: [[검증리그-데이터형태-재현]] · [[project-adpang-production]] · [[project-naver_turafic_samsung]] · [[PostgREST-1000행캡-회피]]
