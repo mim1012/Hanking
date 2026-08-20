@@ -14,8 +14,11 @@
 
 - 2026-08-19 재사용(sellermate 세션): 같은 프로덕션 ref에 DDL을 적용할 때 .env들의 DB URL(비번 회전됨)과 프로세스 env `SUPABASE_ACCESS_TOKEN`(401)이 전부 죽어 있었는데, **Supabase CLI 로그인 자격증명은 살아 있었다**. Windows 자격 증명 관리자 `LegacyGeneric:target=Supabase CLI:supabase`를 CredRead(advapi32 P/Invoke)로 읽으면 유효한 `sbp_` 토큰이 나오고, 그대로 Management API `database/query`에 Bearer로 쓰면 된다. `supabase projects list`가 성공하면 이 경로가 열려 있다는 신호.
 
+- 2026-08-20(022 마이그레이션): `claim_strategy_slot`(단건 경로)도 같은 버그가 있었다. 014가 `claim_strategy_slot_group`의 3군데만 normalize로 교체하고 단건 경로는 그대로 raw 비교로 뒀다. 단건 경로를 따로 쓰는 PC 플릿이 검증된 키워드가 있어도 claim을 못 하는 silent 실패였다. `dev-cache/Temp/zen-nocdp-sm01/supabase-migrations/022-optimize-claim-strategy-slot.sql:128-143` WHERE EXISTS + pool pick 양쪽을 normalize 비교로 통일해 수정 → 프로덕션 `cwsdvgkjptuvbdtxcejt` 적용 완료(2026-08-20).
+
 ## 주의점 / 함정
 - **named failure: "부분 정규화 조인 유실"** — 정규화 함수가 함수 안 한 곳에라도 쓰이고 있으면 "이 함수는 정규화를 쓴다"고 착각하기 쉬운데, 실제로는 조인 조건마다 개별적으로 정규화 여부를 확인해야 한다. 이번 케이스는 같은 함수 안에 정규화 비교(멤버 수집 쿼리)와 원문 비교(대표 슬롯/쿼리 선정 JOIN)가 공존해서 더 발견하기 어려웠다.
+- **named failure: "그룹/단건 이중 경로 포트 드리프트"** — group과 single 두 RPC가 쌍으로 존재할 때 한쪽에만 수정을 이식하면 다른 쪽이 versionless silently 뒤처진다. 014(normalize)·016(3일 재사용 방지)이 group에만 적용되고 single 경로는 여러 마이그레이션 사이클 동안 누락됐다. 수정 후 반드시 두 경로를 함께 확인한다 → [[plpgsql-선읽기-최적화]] 「그룹/단건 이중 경로 포트 드리프트」 항목도 참고.
 - 정규화가 빠진 조인은 에러를 내지 않고 매칭되는 행 수가 조용히 줄어들 뿐이라 로그·예외로는 절대 드러나지 않는다. "후보 수 대비 실제 claim 수" 같은 깔때기(funnel)를 단계별로 직접 세어봐야 발견된다 — 이번엔 기본자격→pool검증→쿨다운통과→candidates매칭 4단계로 쪼개서 153→109→17→6이라는 숫자를 실측하고 나서야 병목 지점을 특정했다.
 
 ## 배제된 접근 (dead-end)

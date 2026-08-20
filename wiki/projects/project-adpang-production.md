@@ -27,6 +27,22 @@
 - **CI 마이그레이션 ledger 판독** — `scripts/apply-supabase-migrations.mjs:40-71`: `_schema_migrations_applied` ledger에 없는 add-/alter-/fix-/grant- 파일만 알파벳순 적용. 레거시 파일들의 "policy already exists"로 워크플로 결론은 항상 failure지만 **새 파일은 앞 순서면 정상 적용됨** — 로그의 `applied:` 라인으로 판정할 것(failure 결론만 보고 미적용 오판 금지).
 - **모바일 뷰포트** — `src/app/layout.tsx`에 `export const viewport`(width=device-width)가 2026-08-19까지 없어서 전 페이지가 모바일에서 980px 데스크톱 렌더 후 축소되던 상태를 수정. Next App Router는 자동 주입 안 함.
 
+### claim_strategy_slot 최적화 + MID 쿨다운 전파 (2026-08-20, 프로덕션 적용 완료)
+- **022 — claim_strategy_slot 4중 버그 수정** (`dev-cache/Temp/zen-nocdp-sm01/supabase-migrations/022-optimize-claim-strategy-slot.sql`):
+  - [A] `strategy_runtime_settings.daily_target` 인라인 서브쿼리 2회(SELECT목록+WHERE) → `v_daily_target` 변수 선읽기 1회로 교체. 슬롯 수 비례 반복 렉 제거. → [[plpgsql-선읽기-최적화]]
+  - [B] `strategy_slot_leases` 인덱스에 `kst_date` 누락 → `idx_strategy_slot_leases_active_kst` CONCURRENTLY 추가.
+  - [C] 단건 경로 normalize 누락(014가 그룹만 수정) → `normalize_query_phrase` 비교 이식. → [[Postgres-함수내-정규화비교-불일치]]
+  - [D] 016(3일 재사용 방지)이 단건 경로에 미이식 → `last_used_at <= now() - interval '3 days'` EXISTS + pool pick 양쪽 추가.
+  - 검증: SQL Editor `pg_get_functiondef` read-back에서 `v_daily_target integer` 확인.
+- **023 — report_strategy_slot MID 형제 쿨다운 전파** (`dev-cache/Temp/zen-nocdp-sm01/supabase-migrations/023-mid-sibling-cooldown.sql`):
+  - 429 10회 연속 시 해당 슬롯만 쿨다운하던 버그 수정. `normalize_mid(mid::text) = v_slot_mid`인 형제 슬롯 전체에 동일한 1시간 쿨다운 전파.
+  - 이유: PC는 고정 IP라 (IP, MID) 조합 단위로 429가 걸리므로 형제도 같이 막힌다. CLAUDE.md 실측(2026-08-16): PC-07 한 대가 90초 내 같은 MID를 슬롯 7개로 7번 연속 접속.
+  - 검증: SQL Editor `pg_get_functiondef` read-back에서 `v_slot_mid text` 확인.
+
+### 운영/플릿 자산 (2026-08-20)
+- **PC 플릿 이벤트 전체 집계** — `src/lib/pc-fleet-status.ts`와 `add-pc-fleet-events-agg-function.sql`의 `get_pc_fleet_events_agg(timestamptz)`가 `pc_runner_events`를 DB hostname 단위로 집계한다. 기존 fallback은 30페이지×1000행 상한으로 24시간 35k 이벤트에서 과소집계되므로, RPC 적용 여부와 `truncated` 경고를 별도 확인한다. PC 관리 화면/API는 `src/app/coupangapp/pc-fleet/page.tsx`, `src/app/api/pc-fleet/route.ts`이며 Vercel production 배포 완료.
+- **키워드 prepare timeout 완화** — `supabase-migrations/optimize-keyword-query-prepare.sql`이 pending 후보 seed partial index, 이미 연결된 candidate 제외, batch 100을 적용한다. 실제 `nvMid-v1` RPC가 HTTP 500/`57014`에서 HTTP 200으로 회복되고 supervisor가 verify에 재진입한 것을 확인했다. → [[Supabase-RPC-대량prepare-timeout-완화]]
+
 ## 주의점
 - **모바일 플릿 jmha 전담 격리 스위치(임시조치, 2026-08-18)** — `android_runtime_settings.mobile_exclusive_customer_id`(현재 'jmha')가 설정되면 `android-admin-server.ts` `leaseTask`가 그 고객의 트래픽 행만 리스하고, `scheduler/traffic/route.ts` 리필도 그 고객 슬롯만 적재(이중 안전장치 + 비대상 행 무한적체 방지, 기존 비-jmha 큐 행 2,896건은 purge). 해제 = DB 행 삭제(재배포 불필요). 커밋 `8f93bd3e`(main). PC 러너 반대 방향(제외) 조치는 [[project-turafic_update]] 015 항목. z1의 `slot_pinned_strict=true`와의 상호작용: jmha 슬롯이 `target_group_id` 미핀이면 z1 흡수 로직에 포함돼 정상 리스.
 - `.env.local`(service_role 키)이 폴더에 존재. `next.config.js`가 빌드시 타입/린트 체크 끔 → 그린 빌드 ≠ 타입세이프.
@@ -40,4 +56,3 @@
 - **`sellermate_traffic_navershopping` 큐+`claim_android_naver_task`/`report_android_naver_task` RPC가 코드상 배선은 돼 있지만 실사용은 6일째 멈춰있었다(named failure, 2026-08-16 실측)** — 큐 테이블 24,861행이 전부 `queued`(claimed=0, completed=0, expired=0), 2026-08-14부터 크론(`api/sellermate/scheduler/traffic`, 5분마다)이 계속 채우기만 함. `android_task_claims`(report 시 기록되는 테이블) 최근 행이 2026-08-10, 그마저 디바이스 1대(`z90-5`)뿐. RPC는 `naver_turafic_samsung/server/lib/tasks.js:308-320`에 정상 배선돼 있어 죽은 코드는 아니지만, 실제 디바이스 트래픽이 이 경로를 안 타고 있음 — 원인 미조사. PC 플릿을 이 큐로 옮기려던 계획(원자적 슬롯 락 공유)이 이 발견 때문에 보류됨(대신 위 "가용 슬롯 계산" 이식만 진행, 락 문제는 별개 과제로 분리).
 
 ## 의존 개념: [[멀티테넌트-요청파이프라인]] · [[네이버-공식API-서명]] · [[정산-포인트-원장]] · [[웹앱-인증-세션-계층]] · [[네이버-순위-계산]] · [[project-turafic_update]]
-
