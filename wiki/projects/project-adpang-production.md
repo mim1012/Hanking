@@ -21,6 +21,12 @@
 - **append-only 로그 retention — pg_cron ctid 배치 삭제** — `supabase-migrations/add-strategy-experiment-log-retention.sql`(⚠️ 현재 체크아웃 브랜치엔 없음 — git 커밋 `3791989`에 존재, `git -C D:\Project\adpang-production show 3791989 -- supabase-migrations/add-strategy-experiment-log-retention.sql`로 열람) `purge_strategy_experiment_log` — `ctid IN (…LIMIT 5000)` 배치 루프(`:40`)로 큰 테이블 락 최소화, 90일 초과 행을 pg_cron 일일 삭제(`:62`), unschedule 후 재등록으로 idempotent(`:59`). retention 창(90일) > 읽기 화면 창(30일)이라 화면 무영향. 무한 적재 감사로그 정리에 재사용.
 - `src/app/api/sellermate/naver-shopping-ad/route.ts:65` — 네이버 쇼핑 상품 URL 판별에 `brand.naver.com`(브랜드스토어) 허용 추가. 동일 규칙이 위저드·구모달에 하드코딩 중복 → 공용 유틸 추출 후보. → [[레거시-코드체계-호환-필터]]
 
+### sellermate 신규 자산 (2026-08-19, 모바일 성능/MID 통계)
+- **MID별 통계 관리자 페이지 — 무거운 집계의 목록/트렌드 분리** — `src/app/api/admin/naver-mid-stats/route.ts`: 기본 GET은 슬롯 전량을 keyword+MID로 그룹핑만(실측 220ms), 직전 순위체크 대비·구간 타수는 `?trends=1`(`handleTrends`, `:207`)로 분리해 클라이언트(`src/app/sellermate/naver-mid-stats/page.tsx` `loadTrends`)가 목록 렌더 후 머지. 통합 응답 시절엔 순위이력 48h 23k행+실험로그 22k행 offset 47왕복=DB 4.3초로 모바일이 "로딩만" 됐던 named failure. 슬롯 상세도 `?detail=1` lazy. 최고관리자 게이트는 `requireMasterAdminFromRequest`(`src/lib/api-auth.ts:81`).
+- **타수(트래픽 작업 수) 집계 소스는 `strategy_experiment_log`** — `android_task_leases.product_id`가 현재 전부 null이라 슬롯 연결 불가(실측 확인). slot_id·mid·success가 온전한 실험로그가 정본.
+- **CI 마이그레이션 ledger 판독** — `scripts/apply-supabase-migrations.mjs:40-71`: `_schema_migrations_applied` ledger에 없는 add-/alter-/fix-/grant- 파일만 알파벳순 적용. 레거시 파일들의 "policy already exists"로 워크플로 결론은 항상 failure지만 **새 파일은 앞 순서면 정상 적용됨** — 로그의 `applied:` 라인으로 판정할 것(failure 결론만 보고 미적용 오판 금지).
+- **모바일 뷰포트** — `src/app/layout.tsx`에 `export const viewport`(width=device-width)가 2026-08-19까지 없어서 전 페이지가 모바일에서 980px 데스크톱 렌더 후 축소되던 상태를 수정. Next App Router는 자동 주입 안 함.
+
 ## 주의점
 - **모바일 플릿 jmha 전담 격리 스위치(임시조치, 2026-08-18)** — `android_runtime_settings.mobile_exclusive_customer_id`(현재 'jmha')가 설정되면 `android-admin-server.ts` `leaseTask`가 그 고객의 트래픽 행만 리스하고, `scheduler/traffic/route.ts` 리필도 그 고객 슬롯만 적재(이중 안전장치 + 비대상 행 무한적체 방지, 기존 비-jmha 큐 행 2,896건은 purge). 해제 = DB 행 삭제(재배포 불필요). 커밋 `8f93bd3e`(main). PC 러너 반대 방향(제외) 조치는 [[project-turafic_update]] 015 항목. z1의 `slot_pinned_strict=true`와의 상호작용: jmha 슬롯이 `target_group_id` 미핀이면 z1 흡수 로직에 포함돼 정상 리스.
 - `.env.local`(service_role 키)이 폴더에 존재. `next.config.js`가 빌드시 타입/린트 체크 끔 → 그린 빌드 ≠ 타입세이프.
