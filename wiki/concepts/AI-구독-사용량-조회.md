@@ -13,13 +13,16 @@
 - **Fireworks 월 사용액** — `usage-widget/widget.py:413` — 잔액 공개 API 없음. `GET api.fireworks.ai/v1/accounts`로 계정 ID 자동 발견 후 `GET /v1/accounts/{id}/billingUsage?startTime=&endTime=`(ISO8601)로 `serverlessCosts[]{costNanoUsd,promptTokens,completionTokens}` 합산.
 - **DeepSeek/Kimi 잔액** — `usage-widget/widget.py:296` / `:323` — `GET api.deepseek.com/user/balance`, `GET api.moonshot.ai(.cn)/v1/users/me/balance` (Bearer 키).
 - **GLM 코딩플랜 쿼터** — `usage-widget/widget.py:351` — `GET api.z.ai/api/monitor/usage/quota/limit`, Authorization에 **Bearer 접두사 없이** 키만.
+- **Codex 멀티계정 병렬 조회** — `usage-widget/widget.py` `fetch_codex`/`_codex_profiles` — 계정마다 완전히 분리된 `CODEX_HOME`(`D:\.codex-1`, `D:\.codex-2`)의 auth.json을 `config.json`의 `codex_profiles`에 등록해 각각 독립 refresh·조회, `Codex (라벨)`로 구분 표시. 전환은 `codex1.cmd`/`codex2.cmd`(`%USERPROFILE%\.local\bin`, PATH 등록)로 `CODEX_HOME`만 바꿔 codex CLI 실행 — Paseo 등 codex CLI를 그대로 실행하는 IDE에서도 이 커맨드를 쓰면 계정이 갈린다.
 
 ## 주의점 / 함정
 - **"refresh 토큰 회수 기록"**: 갱신 후 새 refresh_token을 원본 인증 파일에 되써주지 않으면 CLI 쪽 로그인이 깨진다 (rotating refresh token).
 - Codex refresh_token이 `refresh_token_invalidated`(401)이면 프로그램으로 복구 불가 — `codex login` 재로그인만 답.
 - 전부 비공식 엔드포인트라 응답 스키마 변경 대비 방어적 파싱 필요 (`used_percent` 재귀 탐색 방식).
+- **"같은 CODEX_HOME 세션에 새 계정 로그인 시 이전 계정 refresh_token 무효화"**: 같은 `CODEX_HOME`(같은 로컬 세션) 안에서 계정A→계정B로 `codex login`을 반복하면, OpenAI 서버가 이전 세션의 refresh_token을 죽이는 것으로 보인다. 2026-08-20에 양방향으로 재현(A 로그인 후 B 죽음 → B 재로그인 후 A 다시 죽음). 계정별로 `CODEX_HOME`을 완전히 분리하면(별도 로컬 세션으로 인식) 해결.
 
 ## 배제된 접근 (dead-end)
 - 만료 시 "CLI 한번 실행하세요" 안내만 하는 소극 대응 — Claude Code가 떠 있어도 `.credentials.json`을 안 갱신하는 경우가 있어(만료 3주 방치 확인) 위젯이 직접 refresh해야 실용적.
+- **Codex 멀티계정을 "같은 CODEX_HOME + 계정별 auth.json 사본을 복사해서 바꿔치기"로 구현** — 실패. 사본이 활성 파일과 분리된 뒤 어느 한쪽이 refresh되면 반대쪽 refresh_token이 무효화됨(위 함정 참고). 완전히 분리된 CODEX_HOME(계정당 폴더)으로 전환해야 실사용 가능.
 
 ## 관련: [[project-usage-widget]] · [[실시간-토큰리프레시-락-먼저-비교]]
