@@ -18,7 +18,7 @@
 ## 주의점 / 함정
 - **슬롯 쿨다운/블랙리스트가 slot_id 기준이라 MID(상품) 단위로 걸리는 429를 막지 못한다(named failure: "슬롯≠MID 오매핑 쿨다운")** — `scripts/strategy-a-runner.ts:139,356` `slotCooldowns`가 `Map<slotId, cooldownUntil>`인데, 여러 슬롯(키워드 조합)이 같은 MID를 공유하는 게 정상 설계다(2026-08-16 PC-07 실측: slot 65/66/50/51/64/67/68 전부 `mid=10893254328` 하나를 가리킴). 슬롯 65가 429로 쿨다운 걸려도 같은 MID의 슬롯 66/67/68은 여전히 "가용"으로 잡혀 곧바로 재타격 — PC 1대만으로도 재현됨. [[네이버-순위-계산]]/기존 "429는 MID 단위" 지식과 직결되는데 구현이 slot_id로 잘못 키잉된 사례. 부가 요인: 8대 PC 플릿이 서로 조율 없이 같은 후보 풀을 순회해 슬롯 충돌까지 겹침(Supabase `pc_runner_events` 실측: 15분 창에서 슬롯 39개 중 38개를 여러 PC가 접근, 5분 이내 cross-PC 겹침 1442쌍) — 근본 원인(mid 미분리)과 부가 원인(fleet 조율 부재) 둘 다 있음, mid 기준 전환이 1차 수정 대상.
 - **`PARALLEL_BROWSERS`(동시 브라우저 수) 2→1 하향 적용** — `scripts/strategy-a-runner.ts:79`. 동시 워커가 많을수록 좁은 후보 풀(43슬롯/15상품) 안에서 같은 MID를 여러 워커가 반복 타격해 429가 누적된다는 진단(아래 항목)에 따른 조치, 사용자가 이미 "1개로 하라"고 지시했었는데 코드에 반영 안 돼 있던 걸 재확인 후 수정. 커밋 `5064751d`, origin에 push 완료. **플릿 반영은 세션 종료 시점에 미완료** — sellermate-01(110.10.98.98) 원격 배포 중 막힘: SSH로 접속한 PowerShell 세션의 `$env:Path`에 git이 아예 없음(`C:\Program Files\Git`, `C:\Program Files (x86)\Git` 둘 다 없음 — 이 VPS는 표준 셋업 절차(PC-03~09) 이전에 만들어진 원본 PC라 git 설치 경로가 다르거나 PATH 등록이 안 됐을 가능성), 동시에 `Get-CimInstance Win32_Process`로 확인한 결과 node.exe 프로세스가 0개(직전까지 정상 가동 중이었는데) — daemon이 죽었는지 재시작 대기 중인지 미확인 상태로 세션 종료. **다음 세션 최우선 확인 사항**: sellermate-01 git 위치 특정(`Get-ChildItem -Recurse -Filter git.exe`류) 후 pull+재시작, 나머지 PC-02/04/05/06/07/09도 `PARALLEL_BROWSERS=1` 반영 확인 필요(전부 push 시점엔 아직 미배포).
-- **"429는 IP 기반 아님, MID 단위"라는 기존 확정 지식이 사용자 반례로 뒤집힘** — 위 슬롯≠MID 쿨다운 버그를 조사하던 중, 계속 막히던 MID를 사용자가 자기 컴퓨터에서 정상 접속한 사례가 나와 "전역 MID 차단"으로는 설명 안 됨. 재해석: 차단은 (IP/세션, MID) 조합 단위 — 원격 PC 플릿은 프록시 비활성화라 PC마다 고정 IP로 같은 상품을 반복 타격하는 게 근본 문제(사용자의 1회 수동 접속은 새 신원이라 안 걸림). [[naver-login-redirect-hypothesis]] 메모 갱신, CLAUDE.md "429 원인" 섹션도 갱신함.
+- **"429는 IP 기반 아님, MID 단위"라는 기존 확정 지식이 사용자 반례로 뒤집힘** — 위 슬롯≠MID 쿨다운 버그를 조사하던 중, 계속 막히던 MID를 사용자가 자기 컴퓨터에서 정상 접속한 사례가 나와 "전역 MID 차단"으로는 설명 안 됨. 재해석: 차단은 (IP/세션, MID) 조합 단위 — 원격 PC 플릿은 프록시 비활성화라 PC마다 고정 IP로 같은 상품을 반복 타격하는 게 근본 문제(사용자의 1회 수동 접속은 새 신원이라 안 걸림). turafic_update Claude 프로젝트 메모리 `naver-login-redirect-hypothesis.md`(위키 링크 대상 아님) 갱신, CLAUDE.md "429 원인" 섹션도 갱신함. **이 (IP,MID) 조합 가설은 2026-08-20 CDP 부착 자체가 원인임이 확정되며 폐기됨** — 위 "CDP→noCDP 전환 확정" 항목 참고.
 - **선언만 되고 검증 안 되는 해시** — `VersionInfo.hash`(`auto-updater.ts:29`)가 optional로 선언돼 있으나 **다운로드 무결성 검증에 전혀 안 쓰임**(trust-on-HTTPS). 공급망 관점 갭.
 - **`git reset --hard`가 로컬 변경 소실** — 원격 강제 동기라 원격 PC의 로컬 수정은 조용히 폐기됨.
 - `auto-updater.ts`와 `auto-updater-new.ts`는 바이트 동일 중복.
@@ -72,8 +72,54 @@
 
 ## 관련: [[동시-클레임-랜덤화-떼몰림-방지]]
 
+- **PC 트래픽 러너의 정본이 CDP(Patchright)에서 noCDP(Win32+UIA)로 전환 확정**(2026-08-19~20)
+  — 같은 슬롯 풀·같은 시간대에서 noCDP 호스트(VM1) 287건 중 429 0건, 같은 시간 CDP 플릿은
+  호스트당 3,000~4,500건. IP/헤더/롤아웃%가 아니라 **CDP 부착 자체**가 탐지 신호였음이 확정
+  됨(그동안의 [[봇탐지-우회-스택]] 관련 헤더 위장 시도들이 전부 무의미했던 이유). noCDP 엔진
+  `engines/pc-strategy-a-nocdp/nocdp-click-engine.ps1` + 러너
+  `scripts/strategy-a-nocdp-runner.ts`(기존 claim/report RPC 그대로 재사용). 신규 PC는
+  `zen-nocdp-fleet` 전용 격리 브랜치+매니페스트로 배포하고, 기존
+  `investigate-strategy-a-pc-migration`(CDP)은 레거시/비교 기준으로 격하. 크롬 창이 visible
+  콘솔에 가려 렌더링이 멈추던 별도 버그와 그 우회 → [[크롬창-오클루전-렌더차단]].
+- **jmha 고객 슬롯 PC 제외 임시조치를 해제**(020, 2026-08-20) — 위 015에서 걸었던
+  `customer_id is distinct from 'jmha'`를 `claim_strategy_slot_group`/`claim_strategy_slot`
+  양쪽에서 제거(`supabase-migrations/020-remove-jmha-exclusion-restore-pc-claim.sql`), PC
+  러너도 다시 jmha 슬롯을 claim할 수 있게 원복. 016→019에서 3일→24시간으로 완화한 pool
+  재사용 규칙은 그대로 보존(jmha 조건만 제거, 다른 로직 불변 — 적용 전 Management API로
+  라이브 `pg_get_functiondef`를 직접 재확인해 015/019 이후 다른 변경이 없었음을 검증한 뒤
+  진행). 적용 직후 재확인: jmha 슬롯 200개가 기본 자격조건을 충족.
+- **FleetAgent 설치기에 Chrome 무인설치 + `.env` 자동생성 추가** —
+  `deploy/install-fleet-agent.ps1`이 기존엔 Git/Node/Patchright Chromium만 자동 설치했는데,
+  noCDP는 시스템 Chrome이 필수라 공식 Enterprise MSI(`dl.google.com/edgedl/chrome/install/
+  GoogleChromeStandaloneEnterprise64.msi`)로 무인 설치하는 단계를 추가(이미 있으면 스킵).
+  `-SupabaseUrl`/`-SupabaseKey` 파라미터로 InstallDir에 `.env`가 없을 때만 자동 생성(RLS로
+  보호되는 publishable key라 배포 파일에 넣어도 안전 — 기존 `deploy/README.md` 문서화된
+  전제와 동일). `deploy/install-fleet-via-plink.ps1`은 CSV `Password`/`-GitHubToken`이
+  선언만 되고 실제 원격 호출에 전달 안 되던 걸 연결. 50대 브로커 배포용 원클릭 ZIP
+  (`deploy/TuraficFleetSetup.zip` + `install-zen-nocdp-broker.bat` + 지시서
+  `ZEN-NOCDP-BROKER-RUNBOOK.md`)까지 패키징, 실제 PAT를 채운 배포본은 `.gitignore` 처리해
+  git 유출 없이 별도 보관.
+- **소프트웨어 "최신 버전" 확인은 API가 아니라 실물로 검증** → [[소프트웨어버전-실물검증-API불신]].
+  Chrome versionhistory API의 stable 최상단이 실제 배포 설치파일 채널보다 앞서 있어서, API만
+  보고 VM1(151.0.7922.170)을 "뒤처졌다"고 오판할 뻔했다 — 실제로는 이미 최신 배포판이었음.
+- **FleetAgent로 이미 설치된 PC의 ref를 다른 브랜치로 전환하면 git이 깨진다** —
+  최초 clone이 single-branch clone이라 `-Ref <새 브랜치>`로 재실행해도
+  `git fetch origin <새 브랜치>`는 `FETCH_HEAD`만 채우고 `origin/<새 브랜치>` 추적 참조
+  자체가 없어서, 이어지는 `git reset --hard origin/<새 브랜치>`가 `fatal: ambiguous
+  argument: unknown revision`(exit=128)으로 실패한다. `git remote set-branches --add origin
+  <새 브랜치> && git fetch origin`을 먼저 실행해 추적 참조를 만들어야 함 — sellermate-01을
+  zen-nocdp-fleet으로 전환하며 실측(2026-08-20). `install-fleet-agent.ps1`의 저장소 준비
+  단계 자체엔 아직 이 처리가 없어 다른 PC 전환마다 반복될 함정으로 남음.
+- **PC의 배포 버전을 SSH 자격증명 없이 git ancestry로 확인하는 법** — 각 PC의 FleetAgent가
+  Supabase `workerNodes.gitCommit`으로 하트비트를 보내므로, 그 커밋 해시를
+  `git merge-base --is-ancestor <커밋> origin/<브랜치>`로 로컬에서 대조하면 어느 브랜치에
+  속하는지 비밀번호 없이 알 수 있다. PC-09(`sellermate-09`)를 이 방법으로 확인한 결과
+  `investigate-strategy-a-pc-migration`도 `zen-nocdp-fleet`도 아닌
+  `strategy-a-runner-0815-1249-on-current-infra`라는 별도 브랜치에 머물러 있음을 발견
+  (2026-08-20, 하트비트도 약 하루 정체 — 실사용 중인지 불확실).
+
 - **`claim_strategy_slot_group()` 내 정규화 비교 누락으로 검증된 키워드 대부분이 claim 안 되고 있었다** → [[Postgres-함수내-정규화비교-불일치]]. 2026-08-18 실측: 기본 자격 슬롯 153개 중 실제 claim 가능이 6개뿐이었는데(2차 검증 완료 키워드는 `landing_keyword_pool`에 5,681건이나 쌓여 있었음), `keyword_pipeline_candidates` ↔ `landing_keyword_pool` JOIN 3곳을 정규화 비교로 통일하는 마이그레이션 `supabase-migrations/014-normalize-candidate-phrase-join.sql`을 프로덕션에 직접 적용해 88개로 회복 확인. 진단·적용·검증 전부 Supabase Management API(`SUPABASE_ACCESSTOKEN`)로 PostgREST 키 없이 처리.
 - **sellermate-01(110.10.98.98)의 `C:\sellermate` 배포가 통째로 사라진 채 방치돼 있었다**(2026-08-18 확인) — 러너 코드/`node_modules` 전무, 71바이트 `unified.log`(`npx tsx` 패키지설치 확인 프롬프트에 걸려 멈춘 흔적)만 남음. `StrategyADaemon` 스케줄 작업도 "사용 안 함"(Disabled) 상태로 전환돼 있었고 마지막 실행(2026-08-17 02:58)이 강제종료 코드(`-1073741510`)로 끝난 뒤 재기동 안 됨 — 직전 세션에서 "브라우저 1개로 바꿔라"며 강제종료 후 재배포하다 중단된 것으로 추정. 재배포+daemon 재등록 필요(미해결로 남김).
 - **이 워크트리의 `.env.local`은 프로덕션과 무관한 빈 Supabase 프로젝트를 가리키고 있었다** — `sellermate_slots`가 완전히 비어있고 `sellermate_slot_naver`엔 `mid` not-null 행이 0개, 관련 RPC(`claim_strategy_slot_group` 등)도 전무해서 로컬에서 슬롯 재현 테스트를 하면 오판하기 쉽다. 진짜 프로덕션 project ref(`cwsdvgkjptuvbdtxcejt`)는 메인 저장소(`D:\Project\turafic_update`) `.env`와 이 워크트리 `.env`(`.env.local` 아님)의 `supabase/.temp/project-ref`로 확인했다. 메인 저장소 `.env`의 `SUPABASE_PRODUCTION_KEY`는 레거시 포맷이라 2026-05-22부로 비활성화됨 — 위 Management API 우회로 대체.
 
-## 의존 개념: [[앱-자동업데이트-채널]] · [[봇탐지-우회-스택]] · [[SSH-공개키인증-Win32버그-우회]] · [[Windows예약작업-IT트리거-로그오프함정]] · [[윈도우서버-git-자동배포]] · [[Postgres-함수내-정규화비교-불일치]]
+## 의존 개념: [[앱-자동업데이트-채널]] · [[봇탐지-우회-스택]] · [[SSH-공개키인증-Win32버그-우회]] · [[Windows예약작업-IT트리거-로그오프함정]] · [[윈도우서버-git-자동배포]] · [[Postgres-함수내-정규화비교-불일치]] · [[동시-클레임-랜덤화-떼몰림-방지]] · [[크롬창-오클루전-렌더차단]] · [[소프트웨어버전-실물검증-API불신]]
