@@ -25,6 +25,8 @@
 - **탭 누적이 정확도를 망친다.** 크롬은 인텐트마다 새 탭을 열고 닫지 않아 652개까지 쌓였다. firstPageWebSocketPath()가 옛 탭을 골라 현재 화면과 다른 DOM을 보게 된다. loadAndWait 앞에서 closeStaleTabs()를 불러 1탭을 유지해야 한다.
 - **awaitUrlSettled가 옛 URL을 "안정"으로 오판한다.** CLEAR_TOP|SINGLE_TOP 인텐트는 기존 탭의 URL을 교체하는데, CDP가 볼 때 아직 교체 전이면 옛 URL이 2회 연속 같아 즉시 "안정"으로 통과한다. 인텐트 직전 URL의 호스트와 달라질 때까지 기다려야 한다.
 - **SERP 쇼핑 블록은 지연 로딩이다.** URL이 정착해도 상품 앵커(`nv_mid=`)가 DOM에 아직 없을 수 있다. 스크롤+대기를 반복하는 탐색 루프가 필요하다.
+- **추적 앵커를 안 누르면 유입이 집계 안 된다(순위 미반영).** CDP 클릭이 raw `nv_mid`/광고 앵커를 누르면 상세엔 들어가도 `cr.shopping`/`searchGate` 추적 리다이렉트를 건너뛰어 검색→상품 유입으로 안 잡힌다(초기 naive `querySelector('a[href*="nv_mid=mid"]')||'a[href*="mid"]'`의 함정). 앵커 우선순위를 WebView(`midScanJs`)와 CDP(`midClickJs`)가 `NaverPageScripts.MID_SCORING_HELPERS_JS` 하나로 공유해 `[0] tracked-search-gate` 최우선·광고제외로 통일했다(2026-08-23, `feat/cdp-chrome-session`). → [[유입수-집계되는-진입]]
+- **midLandingMatch 배선**: 크롬은 `midLandingMatch`를 오버라이드 안 하면 인터페이스 기본값 INDETERMINATE라 잘못 진입을 성공으로 집계한다. `clickAnchorByMid`가 클릭한 앵커 href를 반환→`MidClickOutcome.expectedHref`→StrategyA/B 게이트로 넘겨야 MATCH/MISMATCH 판정이 산다(`4e45c96e`).
 
 ## 배제된 접근 (dead-end)
 
