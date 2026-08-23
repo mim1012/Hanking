@@ -52,6 +52,12 @@ main 머지 전까지 lint가 file missing으로 잡는다.)
   실측(`turafic_update/docs/experiment/2026-08-19-strategy-a-429-root-cause.md` §5-A):
   noCDP 호스트 287건 중 RATE_LIMITED 0건 vs 같은 시간·같은 작업 풀을 CDP로 돈 호스트
   3,000~4,500건.
+- **규모에서 재확인 (2026-08-23 함대 승격 번아웃)** — cdp 러너(matched 헤더 포함)를 프로덕션
+  40노드로 승격하니 차단 1%→33%→73%→**100%(15분)**, 성공률 0%로 붕괴 → 즉시 롤백. 같은 함대
+  규모의 nocdp는 RATE_LIMITED 0%. 근거 주석: `turafic_update/scripts/strategy-a-nocdp-runner.ts:9-13`.
+  교훈: **matched 헤더는 저부하·단시간에 증상만 가린다** — CDP 서명은 남아 규모에서 재발. 소수(2노드
+  5%)를 함대 대표로 착각해 확장하면 안 됨(단계적 승격 필수). 상세:
+  `turafic_update/docs/experiment/2026-08-23-session-retro-cdp-promotion-burn-rollback.md`.
 - **headed 전제 + 창 가림** — 실제 창이 렌더돼야 UIA 트리에 요소가 올라온다. 콘솔 창이
   Chrome을 가리거나 세션이 잠기면 트리가 비어 "요소 없음"으로 조용히 실패한다. Chrome의
   occlusion 최적화 비활성화 플래그 + `SetForegroundWindow`가 필수. `--headless`는 성립하지 않는다.
@@ -75,5 +81,9 @@ main 머지 전까지 lint가 file missing으로 잡는다.)
   오르면 CDP 세션 노출량도 같이 는다).
 - **헤더/UA/Client Hints 버전 롤백** — 4개 커밋 시점을 각각 격리 브랜치로 복원해 실행,
   전부 동일하게 차단. 헤더와 성공률 사이에 상관관계 없음.
+- **matched 헤더 cdp를 프로덕션 함대로 승격** — 막다른 길(2026-08-23). 정합 헤더(`--header-mode=matched`)로
+  저부하 차단을 0.7~5%까지 눌렀지만, 40노드 규모에선 CDP 서명이 다시 잡혀 15분 만에 100% 차단.
+  "성공률 높음"에 혹해 CDP로 회귀하지 말 것 — 규모 안전 베이스는 nocdp. (단, 오늘 테스트는 CDP서명과
+  상세물량 7배가 동시라 완전 분리 못 함 — 결정적 실험=nocdp를 동일 상세물량까지 올려도 429=0인지.)
 
 ## 관련: [[봇탐지-우회-스택]] · [[사람행동-시뮬레이션]] · [[유입수-집계되는-진입]] · [[project-turafic_update]]
