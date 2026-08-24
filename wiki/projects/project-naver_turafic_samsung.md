@@ -6,6 +6,7 @@
 - `server/lib/crypto.js:15` `encryptSecret()` — 네이버 계정 자격증명 AES-256-GCM 암호화(`v1:iv:tag:cipher` base64url) + `safeEqual`(상수시간).
 - `server/lib/tasks.js:109` `resolveGroupStrategyOverride()` — 디바이스 그룹 단위 전략 오버라이드(lease 시 그룹값이 product/slot 값보다 우선).
 - `server/lib/landing.js:45,66` `buildNaverSuggestUrl()` / `landingRedirect()` — Toss 리워드 실측 트래픽 시그니처(mtp_sug, base62 ackey, 무관 시드 acq, acr 6-8) 서버측 위조 + `Referrer-Policy: no-referrer` 307 랜딩. Kotlin `SamsungBrowserStrategyB.buildSuggestUrl`과 파라미터 시그니처 동일 유지.
+- `android/SamsungTrafficBot/app/src/main/java/com/navertraffic/samsung/strategy/SamsungBrowserStrategyG.kt:146-190` — Turafic/zero-landing 모바일 `mtp_sug` 검색 URL 생성(8자리 hex ackey, query 접두사 acq, 가중 acr, qdt=0). 정본 비교: `D:\Project\turafic_update\engines\pc-strategy-a\naver-page-scripts.ts:3-64`; 회귀 테스트는 `android/SamsungTrafficBot/app/src/test/java/com/navertraffic/samsung/strategy/SamsungBrowserStrategyGTest.kt:21-43`.
 - `server/lib/admin.js:510` `getExperimentHistory()`(+`buildStints:463`, `rankStatsInWindow:494`) — 전략 실행 로그와 외부 순위 피드를 조인해 전략(A/B/G/H)별 순위개선 스코어카드 산출. `server/web/admin/history.html` 모니터링 UI가 소비.
 - `server/dev-server.js` — npm 의존성 0, Node 표준 라이브러리만으로 계정 lease/heartbeat/rotation API. 무의존 계약 테스트 서버 패턴.
 - `docs/server-schema.sql`, `docs/vercel-supabase-api.md` — 프로덕션 API 계약 문서.
