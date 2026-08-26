@@ -23,6 +23,6 @@
 - **InsuranceApplication 이중 필드(canonical `name`/`breed` + 레거시 `ownerName?`/`petBreed?`, `src/types/index.ts:188`·`:196`)** — 과거 "잠재 drift 버그"로 기록했으나 현재는 폼(`src/app/insurance/apply/page.tsx:65`·`:78`)이 레거시 필드를 채워 쓰고 repo(`src/lib/insurance/repo.ts:81`·`:89`)가 왕복 매핑해 **봉합 상태**. 단 이중 필드 자체는 존치라 새 쓰기 경로가 레거시 필드를 빼먹으면 admin 화면(ownerName 읽음)이 다시 깨진다 — [[레거시-코드체계-호환-필터]] 패턴.
 - **Supabase RLS 무력** — 클라이언트가 `src/lib/supabase/server.ts` 하나뿐이고 service-role 키 사용. API 라우트 가드(`requireAdmin`)가 유일한 방어선 — 새 라우트에 가드 누락 = 금고 개방(AGENTS.md §10-3).
 - **머지된 PR 브랜치 push = 고아 (2026-07-18, #126→#130)** — auto-merge/CI watch가 PR을 머지한 직후 워커가 같은 브랜치에 후속 커밋을 push하면 main에도 PR에도 반영 안 되는 고아가 된다. 구제: main에서 새 브랜치 → 고아 SHA cherry-pick(squash 내용이 main에 있으면 클린 적용) → 새 PR. 예방: 머지 감시와 픽스 라운드를 같은 PR에 동시 운용 금지.
-- **Playwright 기본 타깃이 로컬이 아니라 라이브 Vercel 프리뷰**(`playwright.config.ts` baseURL 폴백) — 무심코 돌리면 로컬 코드가 아니라 배포본을 검증. `E2E_BASE_URL=http://localhost:3000` 명시 시에만 dev 서버 자동 기동.
+- **Vercel 비용 가드(2026-08-26 사고 대응)** — 기본 Playwright·레이아웃 캡처·release QA는 localhost이고, 알려진 Production 호스트는 현재 요청 승인 토큰 없이 config 단계에서 실패한다. 원격 Preview는 worker 1·retry 0, Standard Protection + 자동화 bypass를 사용한다. Meta ExternalAgent 중심 12시간 190만 User-Agent 요청 사고에서 WAF persistent deny·robots·Codex/Claude 전역 룰까지 겹쳐 적용. 상세 [[Vercel-Production-비용-가드]].
 
-## 의존 개념: [[웹앱-인증-세션-계층]] · [[레거시-코드체계-호환-필터]] · [[카카오-네이버-소셜로그인-AuthJS]] · [[서버리스-응답후작업-after]] · [[시각-회귀-베이스라인-게이트]] · [[원자적-조건부-감소]] · [[목데이터-수명-단일정본]] · [[반응형-오프캔버스-모바일]] · [[관리자-즉시저장-패턴]] · [[골든플로우-실구동-게이트]]
+## 의존 개념: [[웹앱-인증-세션-계층]] · [[레거시-코드체계-호환-필터]] · [[카카오-네이버-소셜로그인-AuthJS]] · [[서버리스-응답후작업-after]] · [[시각-회귀-베이스라인-게이트]] · [[Vercel-Production-비용-가드]] · [[원자적-조건부-감소]] · [[목데이터-수명-단일정본]] · [[반응형-오프캔버스-모바일]] · [[관리자-즉시저장-패턴]] · [[골든플로우-실구동-게이트]]
