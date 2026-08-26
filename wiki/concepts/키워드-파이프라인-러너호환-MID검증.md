@@ -24,11 +24,21 @@
 
 2026-08-21 외부 엑셀 키워드를 `verified_excel_import`로 직접 active 처리한 뒤, 김태동 슬롯의 최신 `MID_NOT_FOUND` 샘플 30건이 모두 해당 import 출처였다. `verified_rank=5`는 엑셀에 실제 순위 컬럼이 없어 claim 가능하게 넣은 sentinel 값이었고, noCDP 실행에서 같은 MID를 찾았다는 증거가 아니었다.
 
+## 2026-08-27 현행 구현 (positive→pool 자동 브리지, 굶주림 해소)
+
+- 문제: SRV-01~05는 `verifier-loop.mjs`만 돌아 `candidates.terminal_result=positive`만 남기고 **pool 승격이 없음**. pool을 채우는 정식 경로(`keyword-pipeline.mjs` verifyQueryTasks → `keyword_pipeline_fanout_query_task` → `landing_keyword_pool` upsert)는 SRV 예약작업에 없었고 죽어 있었음 → claimable 슬롯 ~16개로 전멸(러너 굶음).
+- **러너는 verified_rank를 실제로 사용하지 않는다** (`strategy-a-nocdp-runner.ts` rank 참조 0, `claim_strategy_slot`이 러너에 반환하는 값에 rank 없음). 즉 `verified_rank>0`은 claim 게이트 proxy일 뿐(운영 규칙 4의 실증) → **sentinel rank=1**로 positive를 승격해 claim 함수(300줄) 재작성 없이 해금.
+- 마이그레이션(sellermate-contracts, 커밋 0cff5f7): **051** pool identity fail-closed 트리거(active pool은 자기 assignment+mid가 현재 슬롯과 일치해야; 슬롯 변경 시 자동 archive) / **052** 현재-identity positive 1회 대량 승격(21,676행) / **053** `pg_cron promote-positives-1min` 매분 gap-fill 승격(재발방지). candidates 핫테이블 per-row 트리거는 DB CPU 포화(migration 050) 재현 위험이라 배치 cron 선택.
+- ⚠️ **sentinel 위험 상속**: verifier positive(Patchright 브라우저 캐러셀)는 2026-08-21 엑셀 무증거보다 안전하나 noCDP 클릭 surface와 완전 동일은 아님 → MID_NOT_FOUND 잔존 가능. 굶는 슬롯 중 12개는 candidate 전부 negative(MID 캐러셀 실부재)로 구제 불가(상품/키워드 교체 필요).
+
 ## 구현 앵커
 
-- `D:\Project\zero-landing\tools\keyword-pipeline.mjs` — HTTP SERP 수집·검증 및 query dedup
-- `D:\Project\turafic_update\scripts\strategy-a-nocdp-runner.ts` — claim된 query와 MID를 noCDP 엔진에 전달
+- `D:\Project\zero-landing\tools\keyword-pipeline.mjs` — HTTP SERP 수집·검증 및 query dedup (정식 pool 승격 경로 verifyQueryTasks:590)
+- `D:\Project\zero-landing\tools\pipeline\verifier-loop.mjs` — SRV 실행분: candidates positive/negative만 기록(pool·rank 없음, :331-345)
+- `D:\Project\turafic_update\scripts\strategy-a-nocdp-runner.ts` — claim된 query와 MID를 noCDP 엔진에 전달 (verified_rank 미사용)
 - `D:\Project\turafic_update\engines\pc-strategy-a-nocdp\nocdp-click-engine.ps1` — 실제 화면 탐색과 MID 발견·클릭
+- `D:\Project\sellermate-contracts\migrations\051-strict-pool-identity-containment.sql` — pool identity fail-closed 트리거
+- `D:\Project\sellermate-contracts\migrations\052-bulk-promote-current-identity-positives.sql` · `053-recurring-promote-positives.sql` — 대량/상시 positive→pool 승격 (sentinel rank)
 - `D:\Project\turafic_update\supabase-migrations\023-mid-sibling-cooldown.sql` — MID_NOT_FOUND quarantine 규칙
 
 ## 관련
