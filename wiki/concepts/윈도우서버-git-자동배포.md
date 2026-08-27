@@ -39,3 +39,16 @@ PAT는 **fine-grained, 해당 repo 한정, Contents: Read-only**로 발급 — �
 - **각 PC 의존성 부트스트랩** — `turafic_update/deploy/install-fleet-agent.ps1:16-67,117-138`은 Git이 없으면 `Git.Git`, Node.js가 없으면 `OpenJS.NodeJS.LTS`를 WinGet으로 설치하고 PATH/알려진 설치 경로를 다시 확인한 뒤 Node.js 20 이상과 npm을 검증한다.
 - **Windows 작업 등록** — `turafic_update/deploy/install-fleet-agent.ps1:198-209`은 `/IT` 없이 `SYSTEM + onstart + HIGHEST`로 에이전트 하나를 등록하고 최초 `agent-state.json`까지 확인한다. 기존 전역 `node.exe`/`chrome.exe` 종료 방식은 사용하지 않는다.
 - **검증된 경계** — `turafic_update/fleet-agent.test.ts`, `turafic_update/engines/pc-strategy-a/proxy-health.test.ts`와 2026-08-17 로컬 Git 원격 수동 QA에서 설정 매핑, 0% hold, 이전 SHA→새 SHA 업데이트와 health 상태 기록을 확인했다.
+
+## 함대 진단·복구 운영 툴 + 매니페스트 파편화 함정 (turafic_update, 2026-08-26)
+
+재사용 페어(둘 다 정본 인벤토리 `_shared/PC-FLEET-INVENTORY.md` 런타임 파싱, PW 하드코딩·출력 금지):
+
+- **진단** — `turafic_update/fleet-deploy-probe.ps1:20-34`가 deploy 노드(1~10,21~50)만 추려 `:39-49` TCP22 병렬프로브 → `:59-83` plink로 `query user`/`node.exe`/최근 로그 수집 후 **원인 자동분류**(러너 프로세스 없음=FleetAgent 죽음 / Disc 세션=nocdp SendKeys 무효·tscon 필요 / 정상인데 이벤트 없음=차단·hang).
+- **복구** — `turafic_update/fleet-deploy-restart.ps1:56-59`가 끊긴 세션이면 `tscon <sid> /dest:console`로 콘솔 재부착(visible 러너 렌더 조건), `:62` `schtasks /run /tn TuraficFleetAgent`, `:67-72` node.exe + `agent-state.json`으로 검증. `-DryRun` 지원.
+
+배포가 "안 넘어올 때" 3대 함정(2026-08-26 실측):
+
+- **① 매니페스트 파일 파편화** — 노드가 읽는 릴리스 파일은 `fleet-release.json` 고정이 아니라 각 노드 `agent.json`의 `manifestFile` 필드가 결정한다(`fleet-agent-config.ts:90,94`, `fleet-agent.ts:115` = `git show origin/<ref>:<manifestFile>`). 한 브랜치에 `fleet-release*.json`이 8개까지 공존하며 서로 다른 SHA를 핀 → **엉뚱한 파일을 고치면 노드는 조용히 옛 커밋에 머문다**(unchanged라 로그도 안 남음). 진단은 DB `workerNodes.gitCommit` 분포로.
+- **② 미승격 rollout%** — `rolloutPercent`가 5%면 SHA-256 코호트 밖 95% 노드는 핀된 SHA를 무시하고 `config.ref` HEAD를 추적(default-ref-tracking) → 카나리 미승격 시 대부분 직전 빌드에 좌초. 해법=노드가 실제 읽는 manifestFile들을 목표 SHA@100%로 통일 push.
+- **③ shallow fetch 도달성** — 업데이트가 `fetch --depth 30` + `reset --hard <SHA>`(`fleet-agent.ts:189-262`)라, 목표 SHA가 ref tip에서 30커밋 밖이면 실패 → 통일 대상 SHA는 ref tip 근처로.

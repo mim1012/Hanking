@@ -19,7 +19,7 @@
 ## 개념 (재사용 기법) — concepts/
 ### 트래픽/수집 자동화
 - [[봇탐지-우회-스택]] · [[사람행동-시뮬레이션]] · [[IP-로테이션]] · [[캡차-차단-대응]] · [[TLS-임퍼소네이션-WAF우회]]
-- [[네이버-순위-계산]] · [[순위체크-대시보드-배포-게이트]] · [[네이버-공식API-서명]] · [[브라우저-세션쿠키-영속화]] · [[앱-자동업데이트-채널]] · [[유입수-집계되는-진입]] · [[CDP없는-OS레벨-브라우저자동화]] · [[키워드-파이프라인-러너호환-MID검증]] · [[검증리그-데이터형태-재현]] · [[브라우저-셋틀-임계값-함정]] · [[SSH-공개키인증-Win32버그-우회]] · [[Windows예약작업-IT트리거-로그오프함정]] · [[Supabase-무오프셋-타임스탬프-로컬시간오독]] · [[Postgres-함수내-정규화비교-불일치]] · [[크롬창-오클루전-렌더차단]] · [[소프트웨어버전-실물검증-API불신]] · [[plpgsql-선읽기-최적화]]
+- [[네이버-순위-계산]] · [[순위체크-대시보드-배포-게이트]] · [[네이버-공식API-서명]] · [[브라우저-세션쿠키-영속화]] · [[앱-자동업데이트-채널]] · [[유입수-집계되는-진입]] · [[CDP없는-OS레벨-브라우저자동화]] · [[RDP없이-원격-headed-브라우저-관찰]] · [[키워드-파이프라인-러너호환-MID검증]] · [[검증리그-데이터형태-재현]] · [[브라우저-셋틀-임계값-함정]] · [[SSH-공개키인증-Win32버그-우회]] · [[Windows예약작업-IT트리거-로그오프함정]] · [[Supabase-무오프셋-타임스탬프-로컬시간오독]] · [[Postgres-함수내-정규화비교-불일치]] · [[크롬창-오클루전-렌더차단]] · [[소프트웨어버전-실물검증-API불신]] · [[plpgsql-선읽기-최적화]]
 
 ### 앱 자동화/리버싱
 - [[Shizuku-입력주입]] · [[디컴파일-ViewId-자동화]] · [[State-Machine-접근성서비스]] · [[크롬-CDP-온디바이스-브리지]] · [[행정동-기반-지역필터]] · [[카카오T-예약콜-실시간감지]]
@@ -47,7 +47,7 @@
 ### 앱 자동화/리버싱
 - [[project-Vortex]] · [[project-UberAutoAccept]] · [[project-guardian-decompile]] · [[project-Media_enhanced-v1.0]] · [[project-turbo]] · [[project-touchassist]]
 ### 웹앱/SaaS
-- [[project-massage]] · [[project-medical-ERP]] · [[project-wishcat]] · [[project-BAGJO1]] · [[project-tableflow]]
+- [[project-massage]] · [[project-medical-ERP]] · [[project-wishcat]] · [[project-BAGJO1]] · [[project-tableflow]] · [[project-delivery-platform]]
 ### 에이전트 인프라
 - [[project-warm-agent]] · [[project-hermes-agent]] · [[project-oh-my-codex]] · [[project-Decepticon]] · [[project-claude-cockpit]] · [[project-usage-widget]]
 ### 게임 유틸/로컬 OCR
