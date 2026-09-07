@@ -2,7 +2,7 @@
 
 > Karpathy LLM Wiki 패턴 구현. "이 기능 어디서 주워와?"에 즉시 답하는 재사용 색인.
 > Obsidian으로 이 폴더(`D:\Project\_wiki`)를 볼트로 열면 그래프 뷰 + `[[링크]]` 그대로 동작.
-> 현재: 개념 65 · 프로젝트 43 (죽은 링크 0).
+> 현재: 개념 69 · 프로젝트 44 (죽은 링크 0).
 
 ## 🗺️ 도메인별 지도 (여기서 시작)
 - [[네이버-트래픽-커머스]] · [[트레이딩]] · [[앱-자동화-리버싱]] · [[웹앱-SaaS]] · [[소셜-수집]] · [[에이전트-인프라]]
@@ -25,7 +25,10 @@
 - [[Shizuku-입력주입]] · [[디컴파일-ViewId-자동화]] · [[State-Machine-접근성서비스]] · [[크롬-CDP-온디바이스-브리지]] · [[행정동-기반-지역필터]] · [[카카오T-예약콜-실시간감지]] · [[R8-Gson-DTO-keep-함정]]
 
 ### 트레이딩
-- [[KIS-API-계좌포맷]] · [[포트-어댑터-거래소추상화]] · [[리스크-관리-상태기계]]
+- [[KIS-API-계좌포맷]] · [[포트-어댑터-거래소추상화]] · [[리스크-관리-상태기계]] · [[조회전용-분석수집기-주문격리]] · [[원자적-설정파일-쓰기-fail-closed]]
+
+### 데스크톱 GUI/테스트
+- [[Tk-Canvas-도넛-트리맵-시각화]] · [[Tk-테스트-안정화-및-창캡처]]
 
 ### 웹앱/SaaS · 라이브 커머스
 - [[웹앱-인증-세션-계층]] · [[카카오-네이버-소셜로그인-AuthJS]] · [[멀티테넌트-요청파이프라인]] · [[정산-포인트-원장]]
@@ -43,7 +46,7 @@
 ### 커머스/수집/소셜
 - [[project-dorami]] · [[project-band-sourcing]] · [[project-insta]] · [[project-kmong]]
 ### 트레이딩
-- [[project-SOLX]] · [[project-StockDante]] · [[project-mt5]] · [[project-PJT-v4.7-KIS자동매매]] · [[project-Crypto]]
+- [[project-SOLX]] · [[project-StockDante]] · [[project-mt5]] · [[project-PJT-v4.7-KIS자동매매]] · [[project-Crypto]] · [[project-PJT-V5.0]]
 ### 앱 자동화/리버싱
 - [[project-Vortex]] · [[project-UberAutoAccept]] · [[project-guardian-decompile]] · [[project-Media_enhanced-v1.0]] · [[project-turbo]] · [[project-touchassist]]
 ### 웹앱/SaaS

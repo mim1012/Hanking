@@ -1,6 +1,6 @@
-﻿# lint ?먮룞 ?ㅽ뻾 (二쇨컙 ?ㅼ?以? ??2026-08-31 10:00
+﻿# lint ?먮룞 ?ㅽ뻾 (二쇨컙 ?ㅼ?以? ??2026-09-07 10:00
 
-pages: 120 (concepts 63, projects 43)
+pages: 122 (concepts 65, projects 43)
 
 DEAD LINKS: 2
   wiki\concepts\Flutter-DartAOT-Blutter?뺤쟻蹂듭썝.md -> [[kali-migration]]
@@ -9,12 +9,13 @@ DEAD LINKS: 2
 ORPHANS (no inbound links): 1
   wiki\concepts\UA-ClientHints-?뺥빀-CDP紐⑤컮?쇱쐞??md
 
-FILE:LINE refs checked: 278, stale: 36
+FILE:LINE refs checked: 280, stale: 30
+  log.md -> turafic_update/shared/postgrest-paging.ts:21 (file missing)
   log.md -> android/cdp.ts:244 (file missing)
   wiki\concepts\plpgsql-?좎씫湲?理쒖쟻??md -> dev-cache/Temp/zen-nocdp-sm01/supabase-migrations/022-optimize-claim-strategy-slot.sql:71 (file missing)
   wiki\concepts\plpgsql-?좎씫湲?理쒖쟻??md -> dev-cache/Temp/zen-nocdp-sm01/supabase-migrations/022-optimize-claim-strategy-slot.sql:83 (file missing)
   wiki\concepts\plpgsql-?좎씫湲?理쒖쟻??md -> dev-cache/Temp/zen-nocdp-sm01/supabase-migrations/022-optimize-claim-strategy-slot.sql:125 (file missing)
-  wiki\concepts\PostgREST-1000?됱벙-?뚰뵾.md -> turafic_update/scripts/reverify-keyword-pool.ts:38 (file missing)
+  wiki\concepts\PostgREST-1000?됱벙-?뚰뵾.md -> turafic_update/shared/postgrest-paging.ts:21 (file missing)
   wiki\concepts\UA-ClientHints-?뺥빀-CDP紐⑤컮?쇱쐞??md -> turafic_update(rebuild-0814-cdp)/shared/mobile-stealth.ts:183 (file missing)
   wiki\concepts\UA-ClientHints-?뺥빀-CDP紐⑤컮?쇱쐞??md -> turafic_update(rebuild-0814-cdp)/scripts/strategy-a-runner.ts:728 (file missing)
   wiki\concepts\?ㅼ씠踰??쒖쐞-怨꾩궛.md -> rank-check/android/cdp.ts:244 (file missing)
@@ -23,13 +24,6 @@ FILE:LINE refs checked: 278, stale: 36
   wiki\concepts\遊뉙깘吏-?고쉶-?ㅽ깮.md -> zero-android-optionc/app/src/main/java/com/zero/traffic/service/TrafficService.java:300 (file missing)
   wiki\concepts\釉뚮씪?곗?-?몄뀡荑좏궎-?곸냽??md -> ?곕젅??由ы룷?ㅽ듃 ?щ·留?threads_crawler.py:13 (file missing)
   wiki\concepts\釉뚮씪?곗?-?몄뀡荑좏궎-?곸냽??md -> sinsang/src/services/browser_manager.py:124 (file missing)
-  wiki\concepts\???먮룞?낅뜲?댄듃-梨꾨꼸.md -> turafic_update/auto-updater.ts:100 (file missing)
-  wiki\concepts\???먮룞?낅뜲?댄듃-梨꾨꼸.md -> turafic_update/auto-updater.ts:301 (file missing)
-  wiki\concepts\???먮룞?낅뜲?댄듃-梨꾨꼸.md -> turafic_update/auto-updater.ts:236 (file missing)
-  wiki\concepts\???먮룞?낅뜲?댄듃-梨꾨꼸.md -> turafic_update/launcher.ts:268 (file missing)
-  wiki\concepts\???먮룞?낅뜲?댄듃-梨꾨꼸.md -> turafic_update/launcher.ts:505 (file missing)
-  wiki\concepts\???먮룞?낅뜲?댄듃-梨꾨꼸.md -> turafic_update/config.ts:80 (file missing)
-  wiki\concepts\???먮룞?낅뜲?댄듃-梨꾨꼸.md -> turafic_update/auto-updater.ts:29 (file missing)
   wiki\concepts\罹≪감-李⑤떒-???md -> somae-collector/src/services/browser_manager.py:145 (file missing)
   wiki\projects\project-adpang-production.md -> supabase-migrations/fix-sellermate-naver-rank-history-ssot.sql:6 (file missing)
   wiki\projects\project-kmong.md -> scripts/kmong_probe_with_profile.py:23 (file missing)
@@ -62,5 +56,5 @@ log.md issues: 13
   line 97: ?뺤떇 遺덉씪移?(`- YYYY-MM-DD | ?ъ씠??| ?붿빟`)
   line 98: ?뺤떇 遺덉씪移?(`- YYYY-MM-DD | ?ъ씠??| ?붿빟`)
 
-README counts: 媛쒕뀗 62/63, ?꾨줈?앺듃 42/43 -> MISMATCH
+README counts: 媛쒕뀗 65/65, ?꾨줈?앺듃 43/43 -> OK
 
