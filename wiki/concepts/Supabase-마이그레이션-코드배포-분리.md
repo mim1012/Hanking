@@ -90,4 +90,16 @@ default_transaction_read_only = on` 세션 + `information_schema.columns`/`pg_in
 `pg` 직접 연결이 필요하면 리전을 추측하지 말고 이 페이지에 이미 검증된 `aws-1-ap-northeast-2`
 호스트부터 시도할 것 — 마이그레이션 적용이든 스키마 읽기든 같은 연결 정보가 재사용된다.
 
-## 관련: [[검증리그-데이터형태-재현]] · [[project-adpang-production]] · [[project-naver_turafic_samsung]] · [[PostgREST-1000행캡-회피]]
+## 2026-09-11 재사용 — "PR 병합 = 프로덕션 자동배포"일 때의 순서 (badar PR #12)
+
+코드가 새 테이블·RPC를 참조하고 main 병합이 곧 Vercel 프로덕션 배포인 경우, 순서를 **마이그레이션 먼저 → 배포(병합) 나중**으로 고정해야 "코드는 라이브인데 테이블이 없음"(503 `EXCEL_STORAGE_NOT_READY`)을 피한다. 실제 실행 순서:
+1. staging(싱가포르 pooler `aws-0-ap-southeast-1`)에 `supabase db push --db-url postgresql://postgres.<ref>:<url-enc pw>@<pooler>:5432/postgres --dry-run` → 적용 → psql로 `to_regclass`/`to_regprocedure`/`pg_get_functiondef` 확인.
+2. 같은 브랜치를 staging 앱으로 띄워 실파일 업로드→저장→확정→적립까지 검증(→ [[워크트리-격리-PR-staging-검증]]).
+3. production(서울 pooler `aws-0-ap-northeast-2`)에 같은 방식으로 적용(이력 37→39 확인).
+4. 그 다음에 PR 병합 → Vercel main 자동배포 READY 확인 → 배포된 라우트 GET(무세션 401)로 존재 확인.
+- 정본 체크리스트: `badar/docs/engineering-discipline/plans/2026-09-11-settlement-pr-handoff.md:43` — "마이그레이션 이력 확인 후 두 파일 순서 적용", `:85` 이하 staging 검증 결과.
+- 가드 예: `badar/supabase/migrations/20260911020000_excel_workflow_total_accrual.sql:120-127` — 레거시(비엑셀) 확정 회차와 겹치면 `legacy_settlement_requires_reconciliation`으로 중단. 리뷰에서 weekly에만 걸려 있던 것을 daily까지 확장(이중 적립 갭).
+- **함정 「타임스탬프 역전 마이그레이션」** — PR 마이그레이션(`20260910170000`)이 이미 원격에 적용된 main 마이그레이션(`20260911013000`)보다 타임스탬프가 앞서면 `db push`가 `LegacyDbPushMissingRemoteError: Found local migration files to be inserted before the last migration on remote database`로 거부한다. `--include-all`로 순서 무관 적용하되, dry-run 목록이 기대한 파일만인지(`•` 항목 수) 먼저 세고 실행한다.
+- 관리 토큰(`SUPABASE_ACCESS_TOKEN`)이 401이어도 `--db-url`만으로 push가 된다(이 페이지 dead-end의 Management API 경로를 우회). 비밀번호는 `encodeURIComponent`로 인코딩하고 출력에서는 `sed`로 가린다.
+
+## 관련: [[검증리그-데이터형태-재현]] · [[project-adpang-production]] · [[project-naver_turafic_samsung]] · [[PostgREST-1000행캡-회피]] · [[워크트리-격리-PR-staging-검증]] · [[project-delivery-platform]]
