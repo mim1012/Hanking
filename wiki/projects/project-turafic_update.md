@@ -15,6 +15,8 @@
 
 - **`pc_runner_events`(`supabase-migrations/001-pc-runner-events.sql`)가 adpang-production의 PC 플릿 "가용 슬롯 계산"(용량 계획) 기능의 데이터 소스로 재사용됨** — `hostname`/`success`/`ts` 컬럼이 안드로이드의 `strategy_experiment_log`(device_name/success/created_at)와 같은 모양이라 `fleet-capacity.ts`의 순수 계산 함수를 그대로 태울 수 있었음. 상세: [[project-adpang-production]].
 
+- **전략인지 큐 + 노드 capability 디스패치(2026-09-12 프로덕션)** — `supabase-migrations/064-strategy-aware-queue.sql:128,213,278,636` + `066-customer-strategy-codes-and-rpc.sql:91` + `scripts/strategy-a-nocdp-runner.ts:150,748,1544,1378`. 고객이 슬롯별 A~E 다중선택 → enqueue 라운드로빈 → claim v3 capability 필터 → search-runner 자식(`shoppingtab/search-runner.ts:81` `--once`) 또는 nocdp 소셜 디스패치. 상세: [[전략인지-큐-노드-capability-게이트]]. 개통 함정 2건: [[크롬프로필-DPAPI-로그인-이식불가]](로그인 필요 셀은 노드 콘솔 로그인 필수), [[러너-인스턴스락-PID재사용]](`:197,208,281`).
+
 - **실험 그래프 오케스트레이터** — `scripts/exp-graph/exp-graph.mjs` — 실험 상태를 DB(`experiments`/`experiment_runs`, 마이그 `supabase-migrations/060-experiment-graph.sql`)에 두고 PREFLIGHT→FIRE→HEALTH→REPAIR→DOSE→RANK_DELTA 를 결정적 노드로 돌림. 사람은 escalated/judged 에서만. 상세: [[실험-그래프-오케스트레이션]].
 
 ## 주의점 / 함정
