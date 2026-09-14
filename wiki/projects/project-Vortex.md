@@ -31,4 +31,10 @@ Supabase `twinme_accept_flow_events`(jsonb `details`)에 수락 단계별 이벤
 - **기능 갭 분석 기준선** — [[project-touchassist]](경쟁 예약콜 자동화 앱 디컴파일) 대비 Vortex 미보유: (1) [[행정동-기반-지역필터]] "맞춤콜"(인천공항 하드코딩 키워드뿐, 일반 지역필터 없음), (2) 맞춤콜 실시간 팝업 감지→자동거절 상태머신 자체가 없음, (3) `NotificationListenerService` 채널 없음(화면꺼짐/백그라운드 콜 선감지 불가). 우선순위: 지역필터 > 알림감청 > uiautomator dump 폴백 > OCR/반경필터(낮음).
 - **비루팅 실시간감지 한계 재확인** — [[카카오T-예약콜-실시간감지]] — "요청 0" fresh 리딩(e1 리더)은 root/LSPosed 코드주입 전제라 Vortex(Shizuku=ADB shell 권한뿐)에서 재현 불가. 서버 자체가 ~3초 캐시라 화면 기반 폴링과 실질 격차는 크지 않음.
 
-## 의존 개념: [[Shizuku-입력주입]] · [[디컴파일-ViewId-자동화]] · [[State-Machine-접근성서비스]] · [[행정동-기반-지역필터]] · [[카카오T-예약콜-실시간감지]]
+## 의존 개념: [[Shizuku-입력주입]] · [[디컴파일-ViewId-자동화]] · [[State-Machine-접근성서비스]] · [[행정동-기반-지역필터]] · [[카카오T-예약콜-실시간감지]] · [[보안화면-검정-scrcpy-FLAG_SECURE우회]]
+
+## 2·3단계 수락 안정화 (2026-09-14)
+- `Vortex/app/src/main/java/com/example/twinme/domain/state/AcceptButtonTiming.kt:3` — 버튼 안정화250ms·단계간300ms·재시도1200ms·최초포함3회 정책. TouchAssistant의 세대검증 재탐색과 Overrun의 이벤트 후 대기/현재 root 재시도 패턴 참고. 실제 경쟁앱 자료는 `Vortex/apk_extractor/overun-tuto`(overun 철자)에도 있다.
+- `Vortex/app/src/main/java/com/example/twinme/domain/state/handlers/DetectedCallHandler.kt:702` — 입력 성공/프로세스 pending을 구분하고 함수 안 연타를 제거. 기존 코드 Android 재현에서 pending 결과에도3회 전송, 감지bounds를 무시하고540,2080 탭 확인. 수정은 실제 버튼bounds를 사용한다.
+- `Vortex/app/src/androidTest/java/com/example/twinme/AcceptanceTimingUiTest.kt:46` / `:154` — 실기기 로컬 fixture에서 정상버튼 실탭, 무반응시 제한 재시도, 3단계 완료 판정 검증. 실제 카카오T 배차 성공률 검증은 아님. → [[State-Machine-접근성서비스]] · [[Shizuku-입력주입]]
+- 맞춤콜 추가 검증: 수락은 공통 타이밍 적용, 별도 거절 경로는 실패 입력도500ms 간격/최대4회 예산에 포함하도록 수정. JVM120·Android 로컬19 통과. 근거 `Vortex/docs/ACCEPT_TIMING_STABILITY.md`.

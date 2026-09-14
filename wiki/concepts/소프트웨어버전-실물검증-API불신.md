@@ -47,4 +47,14 @@
   COM 호출 자체가 막 받은 파일에서 간헐적으로 실패할 수 있다는 별도 함정은 남아있음 —
   `scripts/verify-installer-msi-version.ps1` 상단 주석 참고).
 
-## 관련: [[project-turafic_update]]
+## 변형: Android 증분빌드가 manifest는 신버전·dex는 구버전으로 갈라진다 (2026-09-08)
+
+같은 원리의 안드로이드 판. Gradle android 증분빌드가 오염되면 **manifest/output-metadata/dumpsys는 신 versionCode(vc76/0.4.59)인데 dex에 컴파일된 `BuildConfig`는 구 versionCode(vc75/0.4.58)**로 남을 수 있다. `generateReleaseBuildConfig`가 새 파일을 만들어도 javac/dex가 캐시된 구 클래스를 dex에 넣어, "설치 vN" 표시가 도처에 뜨는데 **런타임은 구 코드를 실행**한다.
+
+- **이름 붙인 실패 패턴**: *manifest-런타임 버전 스큐*. `adb install -r`, force-stop 재기동, 완전 uninstall+재설치를 각각 시도해도 안 고쳐졌다(3회 실측, 런타임 로그가 계속 "0.4.58/현재 75"). 포그라운드 서비스 앱은 `install -r` 시 구 프로세스가 살아 구 dex를 유지할 수 있다.
+- **해결 = `gradlew clean assembleRelease`(clean 필수)**. `adb install -r`류 재설치가 아니라 빌드 캐시 자체를 비워야 dex가 새 BuildConfig로 다시 컴파일된다.
+- **실물 검증법**: 설치 후 반드시 logcat의 **런타임 버전 로그**로 확정한다 — `sellermate_naver_place_all/rank-check/android-app/app/src/main/java/com/navertraffic/rankchecker/MainActivity.kt:66`가 `네이버 순위체크 <VERSION_NAME> 무인 서비스 준비`를, `Release.kt:105`가 `업데이트 없음: 현재 <VERSION_CODE>`를 찍는다. **dumpsys/output-metadata(=manifest)만 믿으면 안 된다.**
+- 부수 함정: `gradlew clean` 중 Gradle 데몬 JVM 크래시(`hs_err_pid`)가 1회 발생 → 재시도로 통과.
+- dead-end: 재설치 방식(`adb install -r` / force-stop / uninstall+reinstall)으로 구 dex를 밀어내려는 시도 — 빌드 산출물 자체가 구 클래스를 담고 있으므로 몇 번을 재설치해도 런타임 버전이 안 바뀐다(3회 실측이 이 dead-end의 증거).
+
+## 관련: [[project-turafic_update]] · [[project-sellermate_naver_place_all]] · [[앱-자동업데이트-채널]]

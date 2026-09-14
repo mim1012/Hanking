@@ -23,4 +23,4 @@
 - **비루팅(Shizuku/ADB shell 권한)에서 e1 리더 재현** — 불가능. e1 리더는 카카오T 앱 프로세스 내부에 Xposed/LSPosed로 코드를 주입해 그 프로세스의 메모리 내 파싱 결과를 가로채는 방식이며, 이는 Zygote 레벨 후킹이라 구조적으로 root(또는 Magisk+Zygisk)를 전제한다. Shizuku는 ADB shell(uid 2000) 권한만 주는 별도 격리 프로세스일 뿐 — 다른 앱의 프로세스 메모리에 개입하거나 그 안의 메서드를 후킹할 수 없다. 비루팅에서 같은 값을 얻으려면 카카오T 인증 토큰을 별도로 확보해야 하는데, 샌드박싱 때문에 root 없이는 다른 앱의 private storage/메모리에서 토큰을 꺼낼 수 없고, MITM(로컬 VPN 프록시)도 인증서 피닝에 막힐 가능성이 높다.
 - **모듈이 카카오T 인증 토큰으로 직접 API 재현(HTTP fetch)** — 토큰 확보 자체가 비루팅에서 막히는 데다(위 항목), 확보하더라도 <3초 폴링은 rate-limit/밴 위험이라 turbo 프로젝트에서조차 최종 채택하지 않음.
 
-## 관련: [[Shizuku-입력주입]] · [[project-touchassist]] · [[project-turbo]] · [[project-Vortex]]
+## 관련: [[Shizuku-입력주입]] · [[보안화면-검정-scrcpy-FLAG_SECURE우회]] · [[project-touchassist]] · [[project-turbo]] · [[project-Vortex]]
