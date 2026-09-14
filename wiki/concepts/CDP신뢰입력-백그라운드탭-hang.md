@@ -7,8 +7,8 @@ CDP로 Chrome을 몰아 순위체크·스크래핑·E2E를 돌릴 때, 요소 �
 - **CDP 신뢰입력**: `Input.dispatchMouseEvent`(mouseMoved→Pressed→Released), `Input.dispatchTouchEvent`, `Input.synthesizeScrollGesture`. isTrusted=true(진짜 입력). 단 **탭이 포그라운드가 아니면 블록/hang**.
 
 ## 정본 구현 (canonical)
-- `sellermate_naver_place_all/rank-check/android-app/app/src/main/java/com/navertraffic/rankchecker/ChromeDevToolsSocket.kt:82` — `clickAt(x,y)` = CDP 신뢰 마우스 클릭(mouseMoved→mousePressed→mouseReleased). 이게 백그라운드에서 hang하는 주범.
-- `sellermate_naver_place_all/rank-check/android-app/app/src/main/java/com/navertraffic/rankchecker/ChromeDevToolsBridge.kt:142` — `clickPage()`가 페이지네이션 버튼을 **in-page JS `buttons[i].click()`으로 눌러 즉시 반환**하는 정본 패턴(hang 회피). clickAt은 JS click이 실패했을 때만 쓰는 폴백으로 둔다.
+- `sellermate_naver_place_all/rank-check/android-app/app/src/main/java/com/navertraffic/rankchecker/ChromeDevToolsBridge.kt:201` — `clickPageById()`가 페이지네이션 버튼을 **in-page JS `buttons[i].click()`으로만** 누른다(vc85, 2026-09-15). clickAt 폴백은 삭제됐다(`ChromeDevToolsSocket.kt`에 삭제 사유 주석만 남음). vc82 당시 hang 주범이던 `clickAt`(mouseMoved→Pressed→Released)은 `git show 4e4a822:…/ChromeDevToolsSocket.kt`에서 볼 수 있다.
+- 2026-09-15 실측 정정: "JS click은 isTrusted가 아니라 네이버 페이지네이션이 안 된다"는 9/14 가설은 **거짓**. LTE 실기기에서 JS click으로 page2~7 정상 전환. 깊은순위 미발견의 진짜 원인은 스크롤 완료 판정이었다 → [[DOM스캔-원시앵커수-조기종료-깊은순위-NOT_FOUND]].
 
 ## 다른 구현 / 변형
 - 클릭이 isTrusted를 요구하는 핸들러(일부 SPA·안티봇)면 JS click이 무시될 수 있다. 그럴 땐 탭을 `Page.bringToFront`로 포그라운드로 올린 뒤 clickAt, 또는 짧은 타임아웃을 걸고 실패시 폴백.

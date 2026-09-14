@@ -2,7 +2,7 @@
 
 > Karpathy LLM Wiki 패턴 구현. "이 기능 어디서 주워와?"에 즉시 답하는 재사용 색인.
 > Obsidian으로 이 폴더(`D:\Project\_wiki`)를 볼트로 열면 그래프 뷰 + `[[링크]]` 그대로 동작.
-> 현재: 개념 75 · 프로젝트 44 (죽은 링크 0).
+> 현재: 개념 76 · 프로젝트 44 (죽은 링크 0).
 
 ## 🗺️ 도메인별 지도 (여기서 시작)
 - [[네이버-트래픽-커머스]] · [[트레이딩]] · [[앱-자동화-리버싱]] · [[웹앱-SaaS]] · [[소셜-수집]] · [[에이전트-인프라]]
@@ -53,6 +53,7 @@
 - [[State-Machine-접근성서비스]] — 접근성 바인딩 확인·복구; 선택 탭 기반 완료·즉시 정지, 버튼 안정화·pending 중복 탭 방지·실패 입력 재시도 제한
 - [[크롬-CDP-온디바이스-브리지]] — CDP Input(dispatchTouchEvent)이 Android 크롬에서 no-op → 실기기 su input tap으로 클릭
 - [[CDP신뢰입력-백그라운드탭-hang]] — CDP Input.dispatchMouseEvent/Touch/synthesizeScroll이 백그라운드·헤드리스 탭에서 hang(2분+/무한) → 자동화 클릭은 in-page JS click, clickAt 폴백 함부로 활성화 금지(rankchecker vc82 stall)
+- [[DOM스캔-원시앵커수-조기종료-깊은순위-NOT_FOUND]] — 깊은 순위 슬롯이 매일 100회+ 스캔되는데 전부 NOT_FOUND·history 동결("차단" 오진) → 스크롤 완료 판정을 원시 앵커 수(광고·prd_ext 중복 115)가 아니라 필터 후 유기 수(21)+바닥 도달로, 세대 취소·시간예산·부분결과 보존·job_runs.metadata 계측(rankchecker vc85)
 - [[행정동-기반-지역필터]] — 반경/좌표 필터 UI가 실제 매칭과 분리된 죽은 기능 → 행정구역 사전 Set-containment로 매칭
 - [[카카오T-예약콜-실시간감지]] — count API는 "맞춤" 개수만 반환(전체 아님) → 직접 폴링 대신 이미 파싱된 화면만 읽기
 - [[R8-Gson-DTO-keep-함정]] — 릴리스에서만 전필드 null(예외 없음, try-catch도 안 탐) → DTO keep 규칙 등록 필수

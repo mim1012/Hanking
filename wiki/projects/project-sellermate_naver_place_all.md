@@ -3,6 +3,7 @@
 > 단일 PC에서 4개 플랫폼(쇼핑/플레이스/쿠팡 순위 + 트래픽)을 순차 처리하는 모노레포. | 도메인: 네이버/쿠팡 순위·트래픽 | 스택: TS(tsx), Patchright, Supabase | 상태: 활성
 
 ## 핵심 자산 (다른 곳에서 주워올 것)
+- `rank-check/android-app/.../ChromeCdpRanker.kt:600,608,459,352,109` — vc85(2026-09-15) DOM 폴백: organicCount+바닥 판정 스크롤 종료, 세대 취소, 시간예산, 슬롯별 partial, job_runs.metadata 계측. 하네스 `rank-check/test/spike-trusted-paging.mjs`, 관찰 `watch-deeprank-rollout.mjs`, 카나리 큐 `requeue-slots.mjs --assign`. → [[DOM스캔-원시앵커수-조기종료-깊은순위-NOT_FOUND]]
 - `place-check/check-place-rank-core.ts:675` — 플레이스 순위 로직 (canonical). → [[네이버-순위-계산]]
 - `place-check/utils/humanBehavior.ts` — 사람행동 시뮬 (canonical). → [[사람행동-시뮬레이션]]
 - `rank-check/extractors/` — MID 추출 팩토리 (canonical). → [[네이버-순위-계산]]
