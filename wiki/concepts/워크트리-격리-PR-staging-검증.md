@@ -17,7 +17,7 @@
 - 리베이스와 병합 중 무엇을 푸시할지: 겹치는 파일 0이면 리베이스 트리 = 병합 트리이므로, 영어 자동 병합 커밋을 피하려 리베이스 + `--force-with-lease=<branch>:<옛sha>`로 푸시했다.
 
 ## 주의점 / 함정
-- **Turbopack junction 루트 이탈** — 시간을 아끼려 `node_modules`를 main 체크아웃의 것으로 junction 연결하면 `next build`(Next 16 Turbopack)가 `Symlink [project]/node_modules is invalid, it points out of the filesystem root`로 즉시 실패한다. 테스트·tsc는 junction으로도 돌지만 빌드는 안 된다 → 워크트리에 `npm ci` 실설치(20~25초).
+- **Turbopack junction 루트 이탈** — 시간을 아끼려 `node_modules`를 main 체크아웃의 것으로 junction 연결하면 `next build`뿐 아니라 `next dev`(Next 16 Turbopack 기본)도 `Symlink [project]/node_modules is invalid, it points out of the filesystem root`로 패닉한다. dev는 바인딩(`Ready`)까지는 되지만 **첫 라우트 컴파일 시** 죽어서, 서버가 뜬 줄 알고 브라우저를 붙이면 `ERR_CONNECTION_REFUSED`가 난다(2026-09-15 staging 스모크에서 재현). 테스트·tsc는 junction으로도 돈다. 해결: 빌드가 필요하면 워크트리에 `npm ci`(20~25초); **dev 서버·브라우저 스모크만 필요하면 `next dev --webpack`이 Turbopack과 달리 junction을 견딘다** → npm ci 없이 webpack 모드로 staging 스모크 완주(2026-09-15 branch01/rider01 로그인 + 정산·출금·프로모션 화면 전부 200 실증).
 - **워크트리 삭제 후 재생성하면 node_modules도 사라진다** — 두 번째 재생성에서 `'next' is not recognized`가 난 원인. 재생성 시 `npm ci`부터.
 - **Git Bash curl cp949 파일명 깨짐** — `-F files=@한글.xlsx`를 명령줄에 직접 쓰면 서버에 cp949 바이트가 그대로 가서 파일명이 `�ֱ�…`로 저장된다. 명령줄이 아니라 UTF-8 설정 파일(`-K`)로 넘겨야 한다.
 - **junction 삭제 함정** — `git worktree remove --force`는 디렉터리를 재귀 삭제하므로 junction이 남아 있으면 원본 node_modules까지 지울 위험이 있다. 먼저 `(Get-Item path).Delete()`로 링크만 제거하고 지운다.

@@ -17,6 +17,7 @@
 
 ## 주의점 / 함정
 - **수락 완료 오판과 정지 누락 (Vortex, 2026-09-14)** — 탭 문구는 비선택 상태에서도 존재한다. 실제 수락/확인 입력 이후 선택된 목적 화면을 판정하고 실패 다이얼로그를 우선해야 한다. `Vortex/app/src/main/java/com/example/twinme/domain/state/handlers/WaitingForConfirmHandler.kt:153`. 성공 후 다음 root 조회를 기다리지 않고 즉시 정지해야 화면 전환으로 root가 사라져도 멈춘다: `Vortex/app/src/main/java/com/example/twinme/engine/CallAcceptEngineImpl.kt:357`. Android 기기 테스트에서 지연 완료 방식의 실패와 즉시 완료 방식의 통과를 확인했다.
+- **"무시(ignored)"와 "거절(rejected)"이 같은 accepted=false로 보여도 다운스트림 액션이 다르다 (Vortex, 2026-09-15)** — 증상: 출발임박 배지 맞춤콜이 거절 클릭 없이 맞춤 목록에 남아 매 사이클 재감지. 원인: 적격성 판정기 `Vortex/app/src/main/java/com/example/twinme/domain/model/CallEligibilityDecision.kt:41-52`의 임박 분기가 맨 앞에서 `ignored`로 조기 리턴해, 뒤의 맞춤콜 경로(능동 거절)를 굶겼다. `Vortex/app/src/main/java/com/example/twinme/domain/state/MatchCallRejectionPolicy.kt:9-15`는 `!accepted && !ignored`일 때만 거절을 지시한다. 기법: 3상태(수락/거절/무시) 판정기에서 "무시"는 능동 액션이 필요한 항목(맞춤콜처럼 큐에 남는 것)에 절대 쓰지 말고, 분기 추가 시 정책 객체의 기대 액션까지 테스트에 박는다(`CallEligibilityDecisionTest.imminentMatchCall*`). 수락은 비가역 커밋이라 애매하면 거절이 fail-safe. 경쟁앱 오버런도 이 결합케이스는 거절 없이 새로고침만 한다(`Vortex/apk_extractor/overun-tuto/jadx-single/sources/com/overun/tuto/AdvancedMacroService.java:488-534`).
 - **OTA 교체 후 미바인딩** — `pm install -r` 뒤 `enabled_accessibility_services`가 비워질 수 있다. 바인딩 확인 없이 태스크를 시작하면 입력 경로가 보장되지 않으므로, 복구·확인·작업 시작을 하나의 게이트로 묶어야 한다.
 - **무루트 기기** — `su`가 실패하면 자동복구할 수 없다. 이 경우 성공률을 추정해 계속 돌리지 말고 `rootAvailable`/`bindingVerified`를 별도 상태로 보고해 운영자가 제외·조치할 수 있게 한다.
 
