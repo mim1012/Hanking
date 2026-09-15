@@ -156,3 +156,4 @@
 - 2026-09-15 | Compile | 워크트리-격리-PR-staging-검증: junction node_modules에서 Turbopack은 dev도 패닉하지만 next dev --webpack은 견딤(staging 스모크 실증) 보강
 - 2026-09-16 | Compile | 네이버-자동로그인-패스키함정 concept 등재(turafic auto-login.ts:196/206/232 + deploy-naver-login.mjs) — 패스키 오제출·#loginStay 세션미영속·쿠키파일=로그인오판·__NODE__ 신원·npx.cmd. m-shopping 자동로그인 배포 카나리 XEN-08/10 각 100%
 - 2026-09-16 | Compile | Vortex 수락 확인(step3) 실기기 성공 실증 세션: [[State-Machine-접근성서비스]] 주의점에 "탭 결과가 원격로그(Supabase)에만 남으면 디버그 빌드서 탭 발사 관측 불가 → 로컬 Log.i 먼저 + 작동하는 형제 경로(거절)와 비교, 코드탓 단정 전 외부요인 배제" 등재(WaitingForConfirmHandler.kt:277-280 fall-through 재탭 이미 존재·logAcceptFlowOutcome=Supabase行 실독 검증). 검증=95,300원 인천공항 콜 CALL_ACCEPTED+알림음+정지 실증 / 명명된 실패="확인탭 발사 후 5.6초 침묵→콜취소를 우리탭 실패로 오진할 뻔" / dead-end=performAction을 Shizuku좌표탭으로 교체(불필요·반증). 새 페이지 없음, README 색인 줄 보강.
+- 2026-09-15 | Compile | project-BAGJO1 주의점 추가: 로컬 dev 서버 골든 플레이크(하이드레이션 전 클릭 → /login? 네이티브 submit·탭 클릭 무시) 판정법 + OrdersSection 전주문 병렬 조회로 인한 폴링 헛돎(PR4/PR5 선별 통합 세션)
