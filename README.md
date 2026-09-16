@@ -2,7 +2,7 @@
 
 > Karpathy LLM Wiki 패턴 구현. "이 기능 어디서 주워와?"에 즉시 답하는 재사용 색인.
 > Obsidian으로 이 폴더(`D:\Project\_wiki`)를 볼트로 열면 그래프 뷰 + `[[링크]]` 그대로 동작.
-> 현재: 개념 78 · 프로젝트 44 (죽은 링크 0).
+> 현재: 개념 82 · 프로젝트 44 (죽은 링크 0).
 
 ## 🗺️ 도메인별 지도 (여기서 시작)
 - [[네이버-트래픽-커머스]] · [[트레이딩]] · [[앱-자동화-리버싱]] · [[웹앱-SaaS]] · [[소셜-수집]] · [[에이전트-인프라]]
@@ -33,6 +33,10 @@
 - [[CDP없는-OS레벨-브라우저자동화]] — 뭘 바꿔도 똑같이 차단(CDP 부착 자체가 tell) → OS레벨 UIA 실클릭으로 전환
 - [[RDP없이-원격-headed-브라우저-관찰]] — RDP 세션 뺏기면 100% MID_NOT_FOUND → tscon 콘솔복귀 + SSH 스크린샷으로 관찰
 - [[키워드-파이프라인-러너호환-MID검증]] — SERP positive인데 러너는 MID_NOT_FOUND → (slot,MID,query) 실기검증 후에만 active 승격
+- [[PC검증-적립해도-함대성공률-불변-surface-blind-pool]] — PC 검증 적립해도 함대 성공률 그대로(51→48%) → claim이 surface 무관이라 pool 희석, archive+재큐+floor+quota를 한 트랜잭션으로
+- [[negative-삭제후-수집기-재생성-재검증폭풍-negative-memory]] — negative 삭제 직후 수집기가 같은 조합 재생성해 재검증 폭풍 → 삭제 전 복합PK negative_memory에 먼저 기억
+- [[ssh-윈도우-원격명령-인용깨짐-dir-b]] — ssh 경유 `dir /b`가 "매개 변수 형식이 틀립니다"로 인용 깨짐 → 공백 없는 토큰만, 복잡한 건 스크립트 scp 후 `-File` 실행
+- [[Remove-Item-blocked-훅오인-SQL별칭-del-ManagementAPI적용]] — SQL 별칭 `as del`이 Remove-Item으로 오인돼 훅 차단 → del/count(*) 토큰 회피, 스냅샷→적용→read-back 순서
 - [[검증리그-데이터형태-재현]] — 로컬 18/18 통과가 프로덕션 75% → 표본 수 대신 데이터 형태(빈값·경계값) 재현
 - [[브라우저-셋틀-임계값-함정]] — 빈 페이지도 "안정"으로 오판 → 브라우저 UI 텍스트 길이 넘게 임계값 상향
 - [[SSH-공개키인증-Win32버그-우회]] — 키 인식 후 "No more authentication methods to try" → 비밀번호+plink로 우회
