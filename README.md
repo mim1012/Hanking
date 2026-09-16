@@ -51,7 +51,7 @@
 ### 앱 자동화/리버싱
 - [[Shizuku-입력주입]] — 접근성 gesture가 탐지돼 자동클릭 차단 → Shizuku 셸 권한으로 input tap 위장
 - [[디컴파일-ViewId-자동화]] — jadx 힙 OOM으로 디컴파일 실패 → 여유메모리 확보 후 재시도, ViewId를 파싱 상수로
-- [[State-Machine-접근성서비스]] — 접근성 바인딩 확인·복구; 선택 탭 기반 완료·즉시 정지, 버튼 안정화·pending 중복 탭 방지·실패 입력 재시도 제한; "무시(ignored)" 조기리턴이 뒤의 능동 거절 경로를 굶겨 콜이 목록에 남아 재감지 → 3상태 판정기에서 큐에 남는 항목엔 ignored 금지; 탭 결과가 원격로그(Supabase)에만 남으면 디버그 빌드서 "탭 안 나감" 오진 → 로컬 Log.i 먼저 심고 작동하는 형제 경로와 비교
+- [[State-Machine-접근성서비스]] — 접근성 바인딩 확인·복구; 선택 탭 기반 완료·즉시 정지, 버튼 안정화·pending 중복 탭 방지·실패 입력 재시도 제한; "무시(ignored)" 조기리턴이 뒤의 능동 거절 경로를 굶겨 콜이 목록에 남아 재감지 → 3상태 판정기에서 큐에 남는 항목엔 ignored 금지; 탭 결과가 원격로그(Supabase)에만 남으면 디버그 빌드서 "탭 안 나감" 오진 → 로컬 Log.i 먼저 심고 작동하는 형제 경로와 비교; 시스템 팝업(재난문자)이 대상 앱 밀어내 무한 대기 → BACK 말고 대상 앱 재포그라운드(monkey)로 복구
 - [[크롬-CDP-온디바이스-브리지]] — CDP Input(dispatchTouchEvent)이 Android 크롬에서 no-op → 실기기 su input tap으로 클릭
 - [[CDP신뢰입력-백그라운드탭-hang]] — CDP Input.dispatchMouseEvent/Touch/synthesizeScroll이 백그라운드·헤드리스 탭에서 hang(2분+/무한) → 자동화 클릭은 in-page JS click, clickAt 폴백 함부로 활성화 금지(rankchecker vc82 stall)
 - [[DOM스캔-원시앵커수-조기종료-깊은순위-NOT_FOUND]] — 깊은 순위 슬롯이 매일 100회+ 스캔되는데 전부 NOT_FOUND·history 동결("차단" 오진) → 스크롤 완료 판정을 원시 앵커 수(광고·prd_ext 중복 115)가 아니라 필터 후 유기 수(21)+바닥 도달로, 세대 취소·시간예산·부분결과 보존·job_runs.metadata 계측(rankchecker vc85)
