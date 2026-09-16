@@ -28,12 +28,12 @@ verifier가 negative 판정된 `keyword_pipeline_candidates` 행을 보존(UPDAT
 - **"단발 sbGet 1000행 절단"** — PostgREST가 조용히 잘라 가드가 부분적으로만 작동한다. negative_memory는 계속 누적되는 테이블이라 운영 기간이 길어지면 반드시 1000행을 넘긴다.
 - **"배포 순서 역전"** — verifier(삭제 코드)를 수집기(memory 읽기)보다 먼저 재시작하면, 그 사이 라이브 수집기가 아직 못 읽은 negative를 재생성한다. 순서는 테이블 생성 → 수집기 코드 반영·재spawn 확인 → verifier 재시작.
 - **"정규화 비대칭"** — memory는 정규화된 키로 저장되는데 대조 쪽이 원문 그대로면 누락된다. `normalizeQueryPhrase`(공백 정규화·trim)를 양쪽에서 같은 함수로 써야 한다.
-- **"collector-loop.mjs가 같은 커밋에서 못 고쳐진 채 남은 import"** — `D:\Project\zero-landing\tools\pipeline\collector-loop.mjs:7`은 이 negative_memory 가드를 추가한 바로 그 커밋(6cbe742, 2026-09-16)에서도 여전히 `../keyword-pipeline-helpers.mjs`를 직접 import한다(git show 6cbe742로 확인 — 이 파일은 같은 커밋에서 49줄 바뀌었지만 이 import 줄은 그대로). 같은 커밋이 verifier-loop.mjs·pc-verifier-loop.mjs는 `./normalize.mjs` 직접 import로 새로 만들었는데(아래 dead-end 참고) collector만 남았다 — `tools/pipeline/normalize.mjs:1-5` 주석이 서술하는 "VM 배포 디렉터리는 tools/pipeline/만 포함" 전제가 맞다면 collector-loop.mjs는 VM에서 이 import가 깨질 수 있는 미해결 위험이다(이 세션 기준 미수정 확인, 실제 VM 배포 구성으로 재현까지는 못 함).
+- **"상위 폴더 helpers 부재 = VM 크래시루프"(실측)** — `D:\Project\zero-landing\tools\pipeline\collector-loop.mjs:7`은 `toCandidateLedgerRows` 때문에 `../keyword-pipeline-helpers.mjs`를 의도적으로 import한다. VM 배포 디렉터리 `C:\keyword-pipeline\tools\`에 그 파일이 없던 2026-08-31~09-16 동안 XEN-11의 kw-collector가 실제로 10초 주기 크래시루프였고(가설이 아닌 관측), 2026-09-16 16:15 helpers(12,719B)를 6대에 scp하자 같은 분에 첫 사이클(slots 67, upsert 354)이 돌았다. **배포 결합 규칙**: helpers는 이제 `./pipeline/normalize.mjs`를 import하므로 두 파일을 항상 함께 배포하고, `ssh host dir C:\keyword-pipeline\tools`로 크기까지 대조한다. 새 워커 파일이 `tools/pipeline/` 밖을 import하면 배포 목록에 그 파일을 추가하는 것을 잊지 말 것.
 
 ## 배제된 접근 (dead-end)
 
 - negative를 UPDATE로 남겨두기(터미널 상태 보존) — 터미널 테이블이 무한 팽창하고, 이미 DB 트리거가 UPDATE 시 지우도록 되어 있어 애초에 의미가 없다.
-- `tools/pipeline/` 안의 워커가 상위 경로 `../keyword-pipeline-helpers.mjs`를 직접 import — VM 배포 디렉터리가 `tools/pipeline/`만 포함한다는 전제(정본 구현의 normalize.mjs 주석)가 맞다면 import가 깨져 크래시루프 위험이 있다. 이 위험을 피하려고 이 커밋(6cbe742)은 `D:\Project\zero-landing\tools\pipeline\normalize.mjs:1-8`에 정규화 함수 단일 정의를 새로 만들어 verifier-loop.mjs(:18)·pc-verifier-loop.mjs(:23)가 거기서 직접 import하게 했고, 기존 `tools/keyword-pipeline-helpers.mjs:7-12`는 그 파일을 import한 뒤 re-export만 하도록 바꿨다. 다만 collector-loop.mjs(:7)는 같은 커밋에서도 이 회피를 적용받지 못했다(위 주의점 참고) — 즉 이 접근은 "전면 배제"가 아니라 "2/3 파일에서만 배제됨".
+- verifier가 정규화 함수를 얻으려고 상위 경로 `../keyword-pipeline-helpers.mjs`를 import — 2026-09-16 커밋 전 작업트리에서 실제로 그렇게 편집돼 있었다(grep 실독: verifier-loop.mjs:18, pc-verifier-loop.mjs:23). 그대로 6대에 배포했다면 당시 VM에 helpers가 없어 모바일 검증기 전부가 크래시루프였을 것(위 주의점의 collector 실측과 같은 메커니즘). 커밋 6cbe742 전에 `D:\Project\zero-landing\tools\pipeline\normalize.mjs:1-8`에 단일 정의를 만들어 두 verifier가 거기서 import하게 바꾸고, `tools/keyword-pipeline-helpers.mjs:7-12`는 import+re-export로 돌렸다(helpers 내부에서도 직접 호출하므로 re-export만으론 깨짐). git 이력에는 커밋 전 상태가 남지 않아 `git show`만으로는 이 dead-end가 보이지 않는다 — 배포 디렉터리 밖 import는 커밋 전에 잡는 게 규칙.
 
 ## 관련
 
