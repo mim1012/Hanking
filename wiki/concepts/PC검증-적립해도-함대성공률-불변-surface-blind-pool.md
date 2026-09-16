@@ -17,7 +17,17 @@
 ## 다른 구현 / 변형
 
 - `D:\Project\zero-landing\tools\pipeline\verifier-loop.mjs:89-106` — 모바일 검증기의 슬롯 quota를 `landing_keyword_pool`의 active(현재 identity·MID 일치, `verified_rank>0`) 개수로 계산한다. pool에는 surface 컬럼이 없어 그대로 세므로 surface-blind quota의 실물이며, 이 문서가 다루는 희석 문제의 원인 경로 중 하나다.
-- `D:\Project\zero-landing\tools\pipeline\pc-verifier-loop.mjs:103-117` — 같은 굶주림 방지 로직을 PC 검증기는 pool이 아니라 `keyword_pipeline_candidates`의 `verified_surface='pc_tonggeom'` positive 개수로 계산하도록 바꿨다(주석: "pool(모바일검증 포함)로 세면 모바일이 슬롯당 100개+ 채워놔서 PC 검증이 quota 초과로 스킵→굶음"). 같은 `SLOT_POSITIVE_QUOTA=7` 상수를 surface별로 다른 소스에서 채우는 변형.
+- `D:\Project\zero-landing\tools\pipeline\pc-verifier-loop.mjs:103-117` — 같은 굶주림 방지 로직을 PC 검증기는 pool이 아니라 `keyword_pipeline_candidates`의 `verified_surface='pc_tonggeom'` positive 개수로 계산하도록 바꿨다(주석: "pool(모바일검증 포함)로 세면 모바일이 슬롯당 100개+ 채워놔서 PC 검증이 quota 초과로 스킵→굶음"). 같은 `SLOT_POSITIVE_QUOTA` 상수를 surface별로 다른 소스에서 채우는 변형(2026-09-16 기준 기본값 7→10으로 상향 — 아래 "처리량 vs 슬롯당 지연" 참조).
+
+### 처리량 vs 슬롯당 지연
+
+검증기는 MID 그룹을 워커 하나가 순차 처리하고 배치당 슬롯당 후보 3개만 잡아 첫 positive에서 나머지를 release한다 → **배치당 슬롯당 positive ≤1**이라 브라우저를 늘려도 한 슬롯의 소요시간(10개 ≈ 4분)은 안 줄고 동시 슬롯 수만 는다(2026-09-16 실측: 배치 68%가 워커 1개만 가동, 벽시계 3.6s/건 vs 포화 1.5s/건). early-exit release는 스캔을 아끼는 게 아니라 다음 배치로 미루는 것뿐이라 총 스캔 수는 동일하다.
+
+- `D:\Project\zero-landing\tools\pipeline\pc-verifier-loop.mjs:187-199` — under-quota 슬롯 수 < 브라우저 수이면 슬롯당 선점 수(`perSlotTake`)를 늘린다(상한 `KEYWORD_SLOT_TAKE_MAX`=12). 슬롯 수가 많을 땐 기존과 동일하게 3개만 선점해 공정성(positive 0 슬롯의 우선 진입)을 유지.
+- `D:\Project\zero-landing\tools\pipeline\pc-verifier-loop.mjs:352-367` — MID 그룹을 쿼리 1개 단위 엔트리로 분할해(`loadPendingGroups`) 여러 워커가 같은 슬롯의 다른 쿼리를 동시에 스캔한다(엔트리 상한 `BATCH × KEYWORD_SLOT_TAKE_MAX`).
+- `D:\Project\zero-landing\tools\pipeline\pc-verifier-loop.mjs:111-167` — negative 상한: 현재 identity(슬롯의 `keyword_assignment_id`·MID와 일치하는 행만 집계)의 negative_memory가 `KEYWORD_SLOT_NEGATIVE_CAP`(기본 100) 이상이면 그 슬롯을 배치에서 스킵한다(적중률 0%인 슬롯 7348=0/212가 후보만 태우던 것을 차단, negativeMemory 조회 실패 시 fail-open — 상한 미적용). quota는 `KEYWORD_SLOT_POSITIVE_QUOTA`(기본 10).
+
+검증: 배포 직후 로그 `negative 상한 100 도달 — 스킵: slot 7348`, quota 10 적용 후 16슬롯이 동시 진입(15분간 positive 50건).
 
 ## 주의점 / 함정
 

@@ -2,7 +2,7 @@
 
 > Karpathy LLM Wiki 패턴 구현. "이 기능 어디서 주워와?"에 즉시 답하는 재사용 색인.
 > Obsidian으로 이 폴더(`D:\Project\_wiki`)를 볼트로 열면 그래프 뷰 + `[[링크]]` 그대로 동작.
-> 현재: 개념 82 · 프로젝트 44 (죽은 링크 0).
+> 현재: 개념 83 · 프로젝트 44 (죽은 링크 0).
 
 ## 🗺️ 도메인별 지도 (여기서 시작)
 - [[네이버-트래픽-커머스]] · [[트레이딩]] · [[앱-자동화-리버싱]] · [[웹앱-SaaS]] · [[소셜-수집]] · [[에이전트-인프라]]
@@ -35,6 +35,7 @@
 - [[키워드-파이프라인-러너호환-MID검증]] — SERP positive인데 러너는 MID_NOT_FOUND → (slot,MID,query) 실기검증 후에만 active 승격
 - [[PC검증-적립해도-함대성공률-불변-surface-blind-pool]] — PC 검증 적립해도 함대 성공률 그대로(51→48%) → claim이 surface 무관이라 pool 희석, archive+재큐+floor+quota를 한 트랜잭션으로
 - [[negative-삭제후-수집기-재생성-재검증폭풍-negative-memory]] — negative 삭제 직후 수집기가 같은 조합 재생성해 재검증 폭풍 → 삭제 전 복합PK negative_memory에 먼저 기억
+- [[상품명-동기화가-assignment-회전-검증-무한반복-churn가드]] — 슬롯 2개가 하루 80회 assignment 재발급으로 PC 검증 대부분 잠식 → 상품명 sync가 identity를 회전시킨 것; 24h 3회+ 슬롯 수집 스킵 가드 + 상류에서 이름 변경≠identity 변경
 - [[ssh-윈도우-원격명령-인용깨짐-dir-b]] — ssh 경유 `dir /b`가 "매개 변수 형식이 틀립니다"로 인용 깨짐 → 공백 없는 토큰만, 복잡한 건 스크립트 scp 후 `-File` 실행
 - [[Remove-Item-blocked-훅오인-SQL별칭-del-ManagementAPI적용]] — SQL 별칭 `as del`이 Remove-Item으로 오인돼 훅 차단 → del/count(*) 토큰 회피, 스냅샷→적용→read-back 순서
 - [[검증리그-데이터형태-재현]] — 로컬 18/18 통과가 프로덕션 75% → 표본 수 대신 데이터 형태(빈값·경계값) 재현
@@ -55,7 +56,7 @@
 ### 앱 자동화/리버싱
 - [[Shizuku-입력주입]] — 접근성 gesture가 탐지돼 자동클릭 차단 → Shizuku 셸 권한으로 input tap 위장
 - [[디컴파일-ViewId-자동화]] — jadx 힙 OOM으로 디컴파일 실패 → 여유메모리 확보 후 재시도, ViewId를 파싱 상수로
-- [[State-Machine-접근성서비스]] — 접근성 바인딩 확인·복구; 선택 탭 기반 완료·즉시 정지, 버튼 안정화·pending 중복 탭 방지·실패 입력 재시도 제한; "무시(ignored)" 조기리턴이 뒤의 능동 거절 경로를 굶겨 콜이 목록에 남아 재감지 → 3상태 판정기에서 큐에 남는 항목엔 ignored 금지; 탭 결과가 원격로그(Supabase)에만 남으면 디버그 빌드서 "탭 안 나감" 오진 → 로컬 Log.i 먼저 심고 작동하는 형제 경로와 비교; 시스템 팝업(재난문자)이 대상 앱 밀어내 무한 대기 → BACK 말고 대상 앱 재포그라운드(monkey)로 복구
+- [[State-Machine-접근성서비스]] — 접근성 바인딩 확인·복구; 선택 탭 기반 완료·즉시 정지, 버튼 안정화·pending 중복 탭 방지·실패 입력 재시도 제한; "무시(ignored)" 조기리턴이 뒤의 능동 거절 경로를 굶겨 콜이 목록에 남아 재감지 → 3상태 판정기에서 큐에 남는 항목엔 ignored 금지; 탭 결과가 원격로그(Supabase)에만 남으면 디버그 빌드서 "탭 안 나감" 오진 → 로컬 Log.i 먼저 심고 작동하는 형제 경로와 비교; 시스템 팝업(재난문자)이 대상 앱 밀어내 무한 대기 → BACK 말고 대상 앱 재포그라운드(monkey)로 복구; 파싱 시점 좌표를 탭 시점 재사용하면 리스트 재렌더로 엉뚱한 항목 탭("엉뚱한 곳 누름") → 탭 직전 fresh 재조회+가격/경로 identity 관용비교(불일치면 재분석, 스테일 좌표·매직오프셋 금지); 고정 settle 제거로 속도 얻되 ceiling backstop으로 회귀 방지
 - [[크롬-CDP-온디바이스-브리지]] — CDP Input(dispatchTouchEvent)이 Android 크롬에서 no-op → 실기기 su input tap으로 클릭
 - [[CDP신뢰입력-백그라운드탭-hang]] — CDP Input.dispatchMouseEvent/Touch/synthesizeScroll이 백그라운드·헤드리스 탭에서 hang(2분+/무한) → 자동화 클릭은 in-page JS click, clickAt 폴백 함부로 활성화 금지(rankchecker vc82 stall)
 - [[DOM스캔-원시앵커수-조기종료-깊은순위-NOT_FOUND]] — 깊은 순위 슬롯이 매일 100회+ 스캔되는데 전부 NOT_FOUND·history 동결("차단" 오진) → 스크롤 완료 판정을 원시 앵커 수(광고·prd_ext 중복 115)가 아니라 필터 후 유기 수(21)+바닥 도달로, 세대 취소·시간예산·부분결과 보존·job_runs.metadata 계측(rankchecker vc85)
