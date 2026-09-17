@@ -2,7 +2,7 @@
 
 > Karpathy LLM Wiki 패턴 구현. "이 기능 어디서 주워와?"에 즉시 답하는 재사용 색인.
 > Obsidian으로 이 폴더(`D:\Project\_wiki`)를 볼트로 열면 그래프 뷰 + `[[링크]]` 그대로 동작.
-> 현재: 개념 83 · 프로젝트 44 (죽은 링크 0).
+> 현재: 개념 84 · 프로젝트 44 (죽은 링크 0).
 
 ## 🗺️ 도메인별 지도 (여기서 시작)
 - [[네이버-트래픽-커머스]] · [[트레이딩]] · [[앱-자동화-리버싱]] · [[웹앱-SaaS]] · [[소셜-수집]] · [[에이전트-인프라]]
@@ -56,7 +56,7 @@
 ### 앱 자동화/리버싱
 - [[Shizuku-입력주입]] — 접근성 gesture가 탐지돼 자동클릭 차단 → Shizuku 셸 권한으로 input tap 위장
 - [[디컴파일-ViewId-자동화]] — jadx 힙 OOM으로 디컴파일 실패 → 여유메모리 확보 후 재시도, ViewId를 파싱 상수로
-- [[State-Machine-접근성서비스]] — 접근성 바인딩 확인·복구; 선택 탭 기반 완료·즉시 정지, 버튼 안정화·pending 중복 탭 방지·실패 입력 재시도 제한; "무시(ignored)" 조기리턴이 뒤의 능동 거절 경로를 굶겨 콜이 목록에 남아 재감지 → 3상태 판정기에서 큐에 남는 항목엔 ignored 금지; 탭 결과가 원격로그(Supabase)에만 남으면 디버그 빌드서 "탭 안 나감" 오진 → 로컬 Log.i 먼저 심고 작동하는 형제 경로와 비교; 시스템 팝업(재난문자)이 대상 앱 밀어내 무한 대기 → BACK 말고 대상 앱 재포그라운드(monkey)로 복구; 파싱 시점 좌표를 탭 시점 재사용하면 리스트 재렌더로 엉뚱한 항목 탭("엉뚱한 곳 누름") → 탭 직전 fresh 재조회+가격/경로 identity 관용비교(불일치면 재분석, 스테일 좌표·매직오프셋 금지); 고정 settle 제거로 속도 얻되 ceiling backstop으로 회귀 방지
+- [[State-Machine-접근성서비스]] — 접근성 바인딩 확인·복구; 선택 탭 기반 완료·즉시 정지, 버튼 안정화·pending 중복 탭 방지·실패 입력 재시도 제한; "무시(ignored)" 조기리턴이 뒤의 능동 거절 경로를 굶겨 콜이 목록에 남아 재감지 → 3상태 판정기에서 큐에 남는 항목엔 ignored 금지; 탭 결과가 원격로그(Supabase)에만 남으면 디버그 빌드서 "탭 안 나감" 오진 → 로컬 Log.i 먼저 심고 작동하는 형제 경로와 비교; 시스템 팝업(재난문자)이 대상 앱 밀어내 무한 대기 → BACK 말고 대상 앱 재포그라운드(monkey)로 복구; 파싱 시점 좌표를 탭 시점 재사용하면 리스트 재렌더로 엉뚱한 항목 탭("엉뚱한 곳 누름") → 탭 직전 fresh 재조회+가격/경로 identity 관용비교(불일치면 재분석, 스테일 좌표·매직오프셋 금지); 고정 settle 제거로 속도 얻되 ceiling backstop으로 회귀 방지; 리스트레벨 "맞춤 N건" 배지를 개별 콜 속성(isMatchCall)으로 취급해 콜타입 게이트 우회 → 12시간 대절 오수락 → `!isMatchCall &&` 제거로 맞춤콜에도 콜타입 검사 적용(배지=리스트에 X있음이지 이 항목이 X 아님)
 - [[크롬-CDP-온디바이스-브리지]] — CDP Input(dispatchTouchEvent)이 Android 크롬에서 no-op → 실기기 su input tap으로 클릭
 - [[CDP신뢰입력-백그라운드탭-hang]] — CDP Input.dispatchMouseEvent/Touch/synthesizeScroll이 백그라운드·헤드리스 탭에서 hang(2분+/무한) → 자동화 클릭은 in-page JS click, clickAt 폴백 함부로 활성화 금지(rankchecker vc82 stall)
 - [[DOM스캔-원시앵커수-조기종료-깊은순위-NOT_FOUND]] — 깊은 순위 슬롯이 매일 100회+ 스캔되는데 전부 NOT_FOUND·history 동결("차단" 오진) → 스크롤 완료 판정을 원시 앵커 수(광고·prd_ext 중복 115)가 아니라 필터 후 유기 수(21)+바닥 도달로, 세대 취소·시간예산·부분결과 보존·job_runs.metadata 계측(rankchecker vc85)
@@ -98,6 +98,7 @@
 - [[관리자-즉시저장-패턴]] — "삭제 안 됨"·"수정 유실" 사용자 리포트 → 클릭 즉시 DB반영 + 동시요청 busy 가드
 - [[골든플로우-실구동-게이트]] — 문자열assertion 테스트 209개 통과했는데 실버그 배포 → 실브라우저 클릭까지 하는 프리뷰 게이트
 - [[Supabase-마이그레이션-코드배포-분리]] — "SQL 실행했다"인데 응답이 그대로 → git push 코드배포 여부를 별도로 확인
+- [[Supabase-디스크-자동확장-텔레메트리-보존]] — "disk automatically expanded"(90% 도달) 반복 → 무보존 append-only 텔레메트리+블로트, pg_cron 보존+VACUUM FULL로 재발차단(DELETE만으론 OS 반환 안 됨)
 - [[동시-클레임-랜덤화-떼몰림-방지]] — 여러 워커가 매 라운드 같은 후보 1개로 몰림 → 상위 K개 잠금 후 무작위 1개 선택
 - [[Supabase-RPC-대량prepare-timeout-완화]] — 대량 pending 후보 prepare RPC가 statement timeout으로 중단 → seed 인덱스·필터·소batch로 완화
 - [[PostgREST-RPC-40001충돌-30초무응답-PT409]] — Supabase RPC 충돌이 SQL 직접 호출은 1초인데 PostgREST(supabase-js) 경유는 30초+ 타임아웃(무응답) → 40001(재시도 대상)이 아니라 PT409(비재시도 커스텀 409)로 raise
