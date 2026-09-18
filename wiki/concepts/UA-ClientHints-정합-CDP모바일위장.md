@@ -23,4 +23,4 @@
 - **"CDP는 userAgentData를 못 채운다"는 결론은 오판**(2026-08 이전). uad-probe로 반증 — CDP `userAgentMetadata`는 정상 작동. (addInitScript `Object.defineProperty(navigator,'userAgentData',…)` 주입은 Patchright가 무시해 inert였던 게 그 오판의 근거였음.)
 - **noCDP(진짜 크롬)+WUI(UI Automation) 전환은 불필요**했음. noCDP가 통했던 이유도 결국 "진짜 크롬이라 UA/CH 자동 정합"이라는 같은 축 — CDP matched로 동일 효과를 얻으면서 CDP의 DOM 접근 편의를 유지.
 
-## 관련: [[봇탐지-우회-스택]] [[사람행동-시뮬레이션]] [[유입수-집계되는-진입]] [[project-turafic]] [[CDP없는-OS레벨-브라우저자동화]]
+## 관련: [[봇탐지-우회-스택]] [[사람행동-시뮬레이션]] [[유입수-집계되는-진입]] [[project-turafic]] [[CDP없는-OS레벨-브라우저자동화]] [[sec-ch-ua-grease-불일치-네이버쇼핑검색-로그인게이트]]
