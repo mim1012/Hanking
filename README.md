@@ -2,7 +2,7 @@
 
 > Karpathy LLM Wiki 패턴 구현. "이 기능 어디서 주워와?"에 즉시 답하는 재사용 색인.
 > Obsidian으로 이 폴더(`D:\Project\_wiki`)를 볼트로 열면 그래프 뷰 + `[[링크]]` 그대로 동작.
-> 현재: 개념 85 · 프로젝트 44 (죽은 링크 0).
+> 현재: 개념 86 · 프로젝트 44 (죽은 링크 0).
 
 ## 🗺️ 도메인별 지도 (여기서 시작)
 - [[네이버-트래픽-커머스]] · [[트레이딩]] · [[앱-자동화-리버싱]] · [[웹앱-SaaS]] · [[소셜-수집]] · [[에이전트-인프라]]
@@ -103,6 +103,7 @@
 - [[동시-클레임-랜덤화-떼몰림-방지]] — 여러 워커가 매 라운드 같은 후보 1개로 몰림 → 상위 K개 잠금 후 무작위 1개 선택
 - [[Supabase-RPC-대량prepare-timeout-완화]] — 대량 pending 후보 prepare RPC가 statement timeout으로 중단 → seed 인덱스·필터·소batch로 완화
 - [[PostgREST-RPC-40001충돌-30초무응답-PT409]] — Supabase RPC 충돌이 SQL 직접 호출은 1초인데 PostgREST(supabase-js) 경유는 30초+ 타임아웃(무응답) → 40001(재시도 대상)이 아니라 PT409(비재시도 커스텀 409)로 raise
+- [[PostgREST-RPC-옵션파라미터추가-PGRST203-오버로드-무중단]] — 라이브 RPC에 파라미터 추가하다 `Could not choose the best candidate function`(PGRST203) 또는 배포순서 창에서 claim 실패 → 새 파라미터 DEFAULT NULL(no-op)+옛 arity DROP(4-arg 단일)+env 킬스위치, "엉뚱한 경로(폴백)만 필터=no-op" 함정
 
 ### 에이전트 인프라
 - [[윈도우서버-git-자동배포]] — SFTP 수동배포가 서버마다 드리프트 → push하면 5분 내 reset --hard로 반영

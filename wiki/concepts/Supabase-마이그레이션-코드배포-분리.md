@@ -102,4 +102,4 @@ default_transaction_read_only = on` 세션 + `information_schema.columns`/`pg_in
 - **함정 「타임스탬프 역전 마이그레이션」** — PR 마이그레이션(`20260910170000`)이 이미 원격에 적용된 main 마이그레이션(`20260911013000`)보다 타임스탬프가 앞서면 `db push`가 `LegacyDbPushMissingRemoteError: Found local migration files to be inserted before the last migration on remote database`로 거부한다. `--include-all`로 순서 무관 적용하되, dry-run 목록이 기대한 파일만인지(`•` 항목 수) 먼저 세고 실행한다.
 - 관리 토큰(`SUPABASE_ACCESS_TOKEN`)이 401이어도 `--db-url`만으로 push가 된다(이 페이지 dead-end의 Management API 경로를 우회). 비밀번호는 `encodeURIComponent`로 인코딩하고 출력에서는 `sed`로 가린다.
 
-## 관련: [[검증리그-데이터형태-재현]] · [[project-adpang-production]] · [[project-naver_turafic_samsung]] · [[PostgREST-1000행캡-회피]] · [[워크트리-격리-PR-staging-검증]] · [[project-delivery-platform]]
+## 관련: [[검증리그-데이터형태-재현]] · [[project-adpang-production]] · [[project-naver_turafic_samsung]] · [[PostgREST-1000행캡-회피]] · [[워크트리-격리-PR-staging-검증]] · [[project-delivery-platform]] · [[PostgREST-RPC-옵션파라미터추가-PGRST203-오버로드-무중단]]
