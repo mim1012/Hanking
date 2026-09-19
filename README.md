@@ -2,7 +2,7 @@
 
 > Karpathy LLM Wiki 패턴 구현. "이 기능 어디서 주워와?"에 즉시 답하는 재사용 색인.
 > Obsidian으로 이 폴더(`D:\Project\_wiki`)를 볼트로 열면 그래프 뷰 + `[[링크]]` 그대로 동작.
-> 현재: 개념 88 · 프로젝트 44 (죽은 링크 0).
+> 현재: 개념 89 · 프로젝트 44 (죽은 링크 0).
 
 ## 🗺️ 도메인별 지도 (여기서 시작)
 - [[네이버-트래픽-커머스]] · [[트레이딩]] · [[앱-자동화-리버싱]] · [[웹앱-SaaS]] · [[소셜-수집]] · [[에이전트-인프라]]
@@ -31,6 +31,7 @@
 - [[네이버-자동로그인-패스키함정]] — Enter 제출이 "패스키 로그인에 실패"로 튕김·로그인돼도 재기동 로그아웃 → 비번버튼 #loginBtn_* 명시클릭 + 로그인상태유지 #loginStay 체크(옛 #log.login/#keep 사라짐)
 - [[앱-자동업데이트-채널]] — INSTALL_FAILED_UPDATE_INCOMPATIBLE(서명 불일치) → 릴리스 keystore 고정+백업, OTA는 서비스루프 폴링
 - [[유입수-집계되는-진입]] — webView.loadUrl 진입은 유입수 0으로 집계 → 실제 탭 제스처만 유입으로 잡힘
+- [[안드로이드-상품탭-블로그오탐-href좌표스캔-vs-title검색]] — 봇이 상품 대신 m.blog.naver.com 블로그 카드를 탭·상세 미착지("상세 착지 미확인") → 상품명 title검색(findBestNode) 말고 href의 mid로 앵커 좌표를 스캔해 실탭(midScanJs+tapCssPoint). 외부 시스템 Chrome은 CSS→화면좌표 변환 기준 없어 title검색 폴백→블로그 = dead-end, in-app WebView로 통일
 - [[CDP없는-OS레벨-브라우저자동화]] — 뭘 바꿔도 똑같이 차단(CDP 부착 자체가 tell) → OS레벨 UIA 실클릭으로 전환
 - [[RDP없이-원격-headed-브라우저-관찰]] — RDP 세션 뺏기면 100% MID_NOT_FOUND → tscon 콘솔복귀 + SSH 스크린샷으로 관찰
 - [[키워드-파이프라인-러너호환-MID검증]] — SERP positive인데 러너는 MID_NOT_FOUND → (slot,MID,query) 실기검증 후에만 active 승격
