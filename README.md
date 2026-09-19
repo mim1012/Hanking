@@ -2,7 +2,7 @@
 
 > Karpathy LLM Wiki 패턴 구현. "이 기능 어디서 주워와?"에 즉시 답하는 재사용 색인.
 > Obsidian으로 이 폴더(`D:\Project\_wiki`)를 볼트로 열면 그래프 뷰 + `[[링크]]` 그대로 동작.
-> 현재: 개념 87 · 프로젝트 44 (죽은 링크 0).
+> 현재: 개념 88 · 프로젝트 44 (죽은 링크 0).
 
 ## 🗺️ 도메인별 지도 (여기서 시작)
 - [[네이버-트래픽-커머스]] · [[트레이딩]] · [[앱-자동화-리버싱]] · [[웹앱-SaaS]] · [[소셜-수집]] · [[에이전트-인프라]]
@@ -100,6 +100,7 @@
 - [[관리자-즉시저장-패턴]] — "삭제 안 됨"·"수정 유실" 사용자 리포트 → 클릭 즉시 DB반영 + 동시요청 busy 가드
 - [[골든플로우-실구동-게이트]] — 문자열assertion 테스트 209개 통과했는데 실버그 배포 → 실브라우저 클릭까지 하는 프리뷰 게이트
 - [[Supabase-마이그레이션-코드배포-분리]] — "SQL 실행했다"인데 응답이 그대로 → git push 코드배포 여부를 별도로 확인
+- [[마이그레이션-멱등재실행-매push실패-policy이미존재-제약위반]] — CI가 폴더 전체를 매 push 재실행하는데 `policy already exists`·`check constraint ... violated by some row`로 런이 상시 failure → DROP POLICY IF EXISTS+CREATE·CHECK를 NOT VALID·레거시 컬럼정의 제거로 재실행-안전 no-op 성공화(데이터 무변경)
 - [[Supabase-디스크-자동확장-텔레메트리-보존]] — "disk automatically expanded"(90% 도달) 반복 → 무보존 append-only 텔레메트리+블로트, pg_cron 보존+VACUUM FULL로 재발차단(DELETE만으론 OS 반환 안 됨)
 - [[동시-클레임-랜덤화-떼몰림-방지]] — 여러 워커가 매 라운드 같은 후보 1개로 몰림 → 상위 K개 잠금 후 무작위 1개 선택
 - [[Supabase-RPC-대량prepare-timeout-완화]] — 대량 pending 후보 prepare RPC가 statement timeout으로 중단 → seed 인덱스·필터·소batch로 완화
