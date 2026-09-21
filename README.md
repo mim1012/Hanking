@@ -2,7 +2,7 @@
 
 > Karpathy LLM Wiki 패턴 구현. "이 기능 어디서 주워와?"에 즉시 답하는 재사용 색인.
 > Obsidian으로 이 폴더(`D:\Project\_wiki`)를 볼트로 열면 그래프 뷰 + `[[링크]]` 그대로 동작.
-> 현재: 개념 89 · 프로젝트 44 (죽은 링크 0).
+> 현재: 개념 90 · 프로젝트 44 (죽은 링크 0).
 
 ## 🗺️ 도메인별 지도 (여기서 시작)
 - [[네이버-트래픽-커머스]] · [[트레이딩]] · [[앱-자동화-리버싱]] · [[웹앱-SaaS]] · [[소셜-수집]] · [[에이전트-인프라]]
@@ -117,6 +117,7 @@
 - [[CLAUDE.md-로드아웃-패턴]] — 손으로 붙이면 마커 없어 멱등교체·배타검사 무력화 → store.py 경유 마커기반 append
 - [[git훅-PATH잘림-클린PATH커밋]] — `'"node"' is not recognized` (cmd 자식이 PATH 못 찾음) → PATH를 클린 세트로 교체
 - [[워크트리-격리-PR-staging-검증]] — junction node_modules로 next build가 즉시 실패 → 워크트리에 `npm ci` 실설치
+- [[빌드OOM-Windows커밋한도-errno1455-잔여프로세스]] — Gradle/Kotlin 빌드가 OOM(errno 1455)인데 RAM은 남음·"Compilation error"로 위장 → 힙 부족 아니라 Windows 커밋 한도 고갈, 잔여 node/에이전트 프로세스(156개=11.5GB)가 범인 → 커밋 실측·정리·재부팅, 힙 축소는 무효
 
 ## 프로젝트 — projects/
 ### 네이버/커머스 트래픽·순위
