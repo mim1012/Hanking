@@ -1,0 +1,92 @@
+
+*~
+agent/lddecode_roundtrip_test.go
+# ===== Backups / temp / scratch =====
+*.bak*
+bin/
+# ===== Binaries / build artifacts =====
+.build/
+build/
+C:*
+c2agent
+c2server
+C2_STATUS_20260813.md
+certs/
+chisel*
+.codegraph/
+config.*.env
+core.*
+# ===== Core dumps / DB / data =====
+crack_builder/
+*.crt
+cryptor/
+*.csr
+data/
+*.db
+*.db-journal
+delivery/
+deploy/
+deploy_winvm/
+dist/
+*.dll
+docs/dashboard-plan.md
+docs/edr-detection-surface.md
+.DS_Store
+*.dylib
+*.env
+.env
+*.exe
+findings.jsonl
+host_agent_bake_fix.md
+host_agent_online_verify.md
+HOST_C2_CHECK_REPORT.md
+host-verify-status.md
+*.ico
+.idea/
+# ===== IDE / OS =====
+# ===== Intermediate build staging =====
+*.iso
+# ===== Junk / accidental Windows-path filenames =====
+*.key
+*marker*.txt
+*.msi
+msi/
+noted-*
+.omo/
+outputs_raw_cmd*.json
+*.p12
+parameter-incorrect-fix.md
+.pass
+# ===== Payload / delivery artifacts =====
+*.pdf
+*.pem
+*.png
+proc_inquiry_winvm.md
+profiles/
+protocol.md
+*.pyc
+__pycache__/
+.quarantine/
+# quarantined leaky build artifacts (pre-deploy) — never track
+scripts/iptables.rules
+scripts/nftables.rules
+scripts/test_tls.ps1
+scripts/wmi_trigger.ps1
+.secrets-backup/
+# ===== Secrets / env / keys =====
+shell_test_winvm.md
+SMOKE_windows.md
+*.so
+*.srl
+start_lab.sh
+start_nocrypto.sh
+STATUS_REPORT.md
+*.swo
+*.swp
+*.syso
+Thumbs.db
+TODO.md
+*.torrent
+.vscode/
+WINVM_TLS_FIX_REPORT.md
+*.zip

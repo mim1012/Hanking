@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow, noarchive">
+<title>DocViewer</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body class="booted">
+
+<!-- 登录界面 (login gate) -->
+<div id="login-view" class="login-view hidden">
+  <div class="login-card">
+    <div class="login-logo"></div>
+    <div class="login-title" data-i18n="app">DocViewer</div>
+    <div class="login-sub" data-i18n="login.sub">请输入访问授权码，进行连接</div>
+    <input id="login-token" type="password" class="login-input" autocomplete="off"
+           placeholder="访问授权码" data-i18n-ph="login.ph">
+    <div class="login-error" id="login-error" class="hidden"></div>
+    <button id="login-btn" class="login-btn" data-i18n="login.btn">连接</button>
+  </div>
+</div>
+
+<!-- 主界面 -->
+<div id="app-view" class="app hidden">
+
+  <!-- 顶部工具栏 -->
+  <div class="toolbar">
+    <span class="toolbar-title">DocViewer</span>
+    <div class="toolbar-sep"></div>
+    <button class="toolbar-btn" data-tab="screen" data-i18n="tab.screen">远程桌面</button>
+    <button class="toolbar-btn" data-tab="file" data-i18n="tab.file">文件管理</button>
+    <button class="toolbar-btn" data-tab="process" data-i18n="tab.process">进程</button>
+    <div class="toolbar-sep"></div>
+    <button class="toolbar-btn" id="btn-refresh" data-i18n="btn.refresh">刷新</button>
+    <div class="toolbar-spacer"></div>
+    <div class="conn-status">
+      <div class="conn-dot" id="conn-dot"></div>
+      <span id="conn-text" data-i18n="status.connected">已连接</span>
+    </div>
+    <div class="toolbar-sep"></div>
+    <button class="lang-btn" id="lang-toggle">中文 / 한국어</button>
+  </div>
+
+  <div class="main">
+
+    <!-- 左侧设备列表 -->
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <span data-i18n="sidebar.title">设备列表</span>
+        <span class="badge" id="dev-count">0</span>
+      </div>
+      <div class="sidebar-search">
+        <input type="text" id="dev-search" data-i18n-ph="search" placeholder="搜索...">
+      </div>
+      <div class="dev-list" id="dev-list"></div>
+    </div>
+
+    <!-- 中央区域 -->
+    <div class="remote-area">
+      <div id="tab-screen" class="tab-content active">
+        <div class="remote-screen">
+          <div class="remote-screen-inner">
+            <div class="screen-placeholder">
+              <div id="live-screen" class="fake-desktop">
+                <span class="connecting-msg" data-i18n="screen.connecting">等待连接...选择一个设备查看远程桌面。</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+<div id="tab-file" class="tab-content panel-page">
+  <div class="file-toolbar">
+    <span class="file-path-span" data-i18n="tab.file">文件管理</span>
+    <div class="file-path-bar">
+      <input type="text" id="file-path-input" value="C:\">
+      <button id="file-go-btn" class="toolbar-btn">Go</button>
+    </div>
+  </div>
+  <div class="file-browser" id="file-browser">
+    <div class="muted" data-i18n="file.todo">请选择一个设备并点击 Go 浏览文件。</div>
+  </div>
+</div>
+<div id="tab-process" class="tab-content panel-page">
+  <div class="proc-toolbar">
+    <span data-i18n="tab.process">进程</span>
+    <button id="proc-refresh" class="toolbar-btn" data-i18n="btn.refresh">刷新</button>
+    <div class="proc-search-wrapper">
+      <input type="text" id="proc-search" placeholder="搜索..." data-i18n-ph="search">
+    </div>
+  </div>
+  <div class="proc-table-wrap">
+    <table class="proc-table" id="proc-table">
+      <thead><tr><th data-i18n="proc.pid">PID</th><th data-i18n="proc.name">进程名</th><th></th></tr></thead>
+      <tbody id="proc-tbody"></tbody>
+    </table>
+  </div>
+</div>
+      <div class="statusbar">
+        <div class="status-item"><span class="status-key">Server:</span><span class="status-val" id="st-server">-</span></div>
+        <div class="status-item"><span class="status-key">Devices:</span><span class="status-val" id="st-online">0</span></div>
+        <div class="status-item"><span class="status-key">Key:</span><span class="status-val" id="st-ver">-</span></div>
+        <div class="status-item" style="margin-left:auto;"><span class="status-key">Status:</span><span class="status-val" id="st-state">ok</span></div>
+      </div>
+    </div>
+
+    <!-- 右侧信息面板 -->
+    <div class="right-panel">
+      <div class="panel-section">
+        <div class="panel-section-header" data-i18n="info.title">设备信息</div>
+        <div class="panel-section-body">
+          <div class="panel-row"><span class="panel-label" data-i18n="info.host">主机名</span><span class="panel-value" id="info-host">-</span></div>
+          <div class="panel-row"><span class="panel-label" data-i18n="info.addr">地址</span><span class="panel-value" id="info-addr">-</span></div>
+          <div class="panel-row"><span class="panel-label" data-i18n="info.os">系统</span><span class="panel-value" id="info-os">-</span></div>
+          <div class="panel-row"><span class="panel-label" data-i18n="info.state">状态</span><span class="panel-value" id="info-state">-</span></div>
+          <div class="panel-row"><span class="panel-label" data-i18n="info.status">设备号</span><span class="panel-value mono" id="info-id">-</span></div>
+        </div>
+      </div>
+      <div class="panel-section">
+        <div class="panel-section-header" data-i18n="mode.title">连接信息</div>
+        <div class="panel-section-body">
+          <div class="panel-row"><span class="panel-label" data-i18n="mode.game">运行状态</span><span class="panel-value" id="info-game">-</span></div>
+          <div class="panel-row"><span class="panel-label" data-i18n="mode.last">最后在线</span><span class="panel-value" id="info-last">-</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/app.js"></script>
+</body>
+</html>
