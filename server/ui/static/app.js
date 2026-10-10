@@ -327,31 +327,56 @@
     msePump();
   }
 
+  function hidePlayOverlay() {
+    var el = document.getElementById("play-overlay");
+    if (el) el.style.display = "none";
+  }
+  function showPlayOverlay(v) {
+    var s = document.getElementById("live-screen");
+    if (!s || !v) return;
+    var el = document.getElementById("play-overlay");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "play-overlay";
+      el.textContent = "▶";
+      el.style.cssText = "position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:64px;color:#fff;background:rgba(0,0,0,.35);cursor:pointer;z-index:6";
+      s.appendChild(el);
+    }
+    el.style.display = "flex";
+    el.onclick = function (ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      var p = v.play();
+      if (p && p.then) p.then(hidePlayOverlay).catch(function () {});
+      else hidePlayOverlay();
+    };
+  }
   function mseEnsurePlaying() {
     var s = document.getElementById("live-screen");
     var v = s ? s.querySelector("video.live-video") : null;
     if (!v) return;
-    // 시작 시 0.1s 버퍼 축적까지 재생 시작 보류 → 이후 배치 버스트를 흡수해 끊김 방지(딜레≈0.1초)
-    // 이후 2.0s 이상 밀리면 끝-0.1s 위치로 재동기화 (버퍼 상시 0.1s 여유)
     if (v.buffered.length) {
       var end = v.buffered.end(v.buffered.length - 1);
-      if (!mseSeekDone) {
-        if (end >= 0.8) {
-          try { v.currentTime = Math.max(0, end - 0.5); } catch (e) {}
-          mseSeekDone = true;
-        }
-        // 모바일: 버퍼 대기 중 pause 하면 네이티브 재생 아이콘에 고정됨. pause 하지 않음.
-        var p0 = v.play();
-        if (p0 && p0.catch) p0.catch(function () {});
-        return;
+      var start = v.buffered.start(0);
+      // 첫 재생은 버퍼 시작부터. 라이브 끝으로 점프하면 키프레임 없어 검정이 됨.
+      if (!mseSeekDone && end > start) {
+        try { if (v.currentTime < start) v.currentTime = start; } catch (e) {}
+        mseSeekDone = true;
       }
-      if (end - v.currentTime > 1.5) {
-        try { v.currentTime = Math.max(0, end - 0.5); } catch (e) {}
+      // 2.5초 이상 밀릴 때만 따라잡기
+      if (mseSeekDone && end - v.currentTime > 2.5) {
+        try { v.currentTime = Math.max(start, end - 0.8); } catch (e) {}
       }
     }
-    if (v.paused && mseSeekDone) {
+    if (v.paused) {
       var p = v.play();
-      if (p && p.catch) p.catch(function () {});
+      if (p && p.then) {
+        p.then(function () { if (v.videoWidth) hidePlayOverlay(); }).catch(function () { showPlayOverlay(v); });
+      }
+    } else if (v.videoWidth) {
+      hidePlayOverlay();
+    } else {
+      showPlayOverlay(v);
     }
   }
 
@@ -401,6 +426,7 @@
       video.addEventListener("loadedmetadata", function () { mseEnsurePlaying(); });
       // 모바일: 재생 아이콘 탭도 사용자 제스처로 play()
       video.onclick = function () { var p = video.play(); if (p && p.catch) p.catch(function(){}); };
+      s.style.position = "relative";
       s.appendChild(video);
     }
     mseStopped = false;
