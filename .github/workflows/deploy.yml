@@ -5,6 +5,10 @@ on:
     branches: [main]
   workflow_dispatch:
 
+concurrency:
+  group: deploy-vps
+  cancel-in-progress: false
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
@@ -36,6 +40,8 @@ jobs:
             cp /root/c2_deploy/c2push.py /root/c2/c2push.py
             chmod +x /root/c2/c2server
             systemctl start c2server
+            sleep 2
+            systemctl is-active c2server || { journalctl -u c2server -n 40 --no-pager; exit 1; }
             systemctl restart c2push
             echo "deploy ok"
           '
@@ -48,6 +54,9 @@ jobs:
           SSHOPTS="-i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o IdentitiesOnly=yes"
           ssh $SSHOPTS ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} '
             sleep 60
+            echo "=== c2server status ==="
+            systemctl is-active c2server || true
+            journalctl -u c2server -n 30 --no-pager || true
             echo "=== journalctl grep (BLANC-101|PC-115|ffmpeg|ERR|끊) ==="
             journalctl -u c2push -n 200 --no-pager | grep -E "BLANC-101|PC-115|ffmpeg|ERR|끊"
             echo "=== (context) BLANC-101 / PC-115 최근 40줄 ==="
