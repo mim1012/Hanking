@@ -1,0 +1,48 @@
+name: deploy-to-vps
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Build c2server (linux amd64)
+        working-directory: server
+        run: |
+          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -buildvcs=false -ldflags="-s -w" -o c2server .
+
+      - name: Upload binaries to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: "server/c2server,c2push/c2push.py"
+          target: "/root/c2_deploy"
+
+      - name: Apply + restart services
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -e
+            systemctl stop c2server
+            cp /root/c2_deploy/server/c2server /root/c2/c2server
+            cp /root/c2_deploy/c2push/c2push.py /root/c2/c2push.py
+            chmod +x /root/c2/c2server
+            systemctl start c2server
+            systemctl restart c2push
+            echo "deploy ok"
