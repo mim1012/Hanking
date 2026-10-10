@@ -595,6 +595,8 @@
     document.getElementById("tab-screen").onclick = function () { showTab("screen"); };
     document.getElementById("tab-file").onclick = function () { showTab("file"); loadFileTab(); };
     document.getElementById("tab-process").onclick = function () { showTab("process"); loadProcTab(); };
+    // 초기 부팅 시 로그인 게이트를 보이게 (둘 다 hidden이면 완전 백/검정 화면)
+    showLogin(true);
   }
 
   function showTab(name) {
