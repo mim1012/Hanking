@@ -135,9 +135,34 @@
     var list = document.getElementById("dev-list");
     var q = (document.getElementById("dev-search").value || "").toLowerCase();
     var dwNow = Date.now();
-    var shown = roster.filter(function (a) {
+    // C2 에이전트(시청 가능) + WinHips 노드를 한 목록으로
+    var byId = {};
+    roster.forEach(function (a) { if (a && a.id) byId[a.id] = a; });
+    winhipsClients.forEach(function (c) {
+      var id = c.agent_id || ("wh-" + (c.pcname || c.ip || ""));
+      if (!id) return;
+      var exist = byId[id];
+      if (!exist) {
+        byId[id] = {
+          id: id,
+          hostname: c.pcname || id,
+          remote_addr: c.ip || c.lanip || "",
+          mac: c.mac || "",
+          game_id: c.gamenames || "",
+          online: true,
+          hangame: true,
+          streamable: !!c.streamable,
+          _winhips: true
+        };
+      } else {
+        exist.hangame = exist.hangame || true;
+        if (c.streamable) exist.streamable = true;
+      }
+    });
+    var merged = Object.keys(byId).map(function (k) { return byId[k]; });
+    var shown = merged.filter(function (a) {
       // 목록 고정: 시청 가능(초록) 좌석 + 유예 2분 내 이탈 좌석 유지 — 잠깐의 상태 불리기로 목록이 흔들리지 않게
-      var qual = a.online && a.hangame && a.streamable;
+      var qual = a.online && (a.hangame || a._winhips) && (a.streamable !== false);
       if (!qual && !(dwellMap[a.id] && dwNow - dwellMap[a.id] < DWELL_MS)) return false;
       if (!q) return true;
       return (a.hostname || "").toLowerCase().indexOf(q) >= 0 || (a.remote_addr || "").toLowerCase().indexOf(q) >= 0;
@@ -584,8 +609,11 @@
         showLogin(false);
         setConn(true);
         refreshAgents();
+        refreshWinhips();
         var poll = setInterval(refreshAgents, 3000);
+        var whPoll = setInterval(refreshWinhips, 3000);
         window._agentPoll = poll;
+        window._whPoll = whPoll;
       }).catch(function () {
         document.getElementById("login-err").textContent = t("login.err");
       });
@@ -605,6 +633,13 @@
       document.getElementById("tab-" + t).classList.toggle("active", t === name);
       document.getElementById("pane-" + t).classList.toggle("hidden", t !== name);
     });
+  }
+
+  function refreshWinhips() {
+    api("/tools/winhips_clients.json").then(function (j) {
+      winhipsClients = (j && j.clients) || [];
+      renderAgents();
+    }).catch(function () {});
   }
 
   function refreshAgents() {
