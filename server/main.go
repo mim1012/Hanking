@@ -305,6 +305,7 @@ func main() {
 	mux.HandleFunc("/admin/download", requireAdmin(handleAdminDownload))
 	mux.HandleFunc("/admin/stream", requireAdmin(handleAdminStream))
 	mux.HandleFunc("/admin/wsstream", requireAdmin(handleAdminWSStream))
+	mux.HandleFunc("/admin/webrtc/offer", requireAdmin(handleAdminWebRTCOffer))
 
 	mux.HandleFunc("/admin/file", requireAdmin(handleAdminFileGet))
 	// v1.6.0 multi-stage: loader fetches raw agent PE for in-memory run
@@ -1303,6 +1304,7 @@ func applyStreamFrameBinary(agentID string, frame []byte) {
 			}
 			streamSegs[agentID] = segs
 			streamNotify(agentID) // 세그 도착 → 대기 롱폴 즉시 기상
+			go feedWebRTC(agentID, append([]byte(nil), payload...))
 		}
 	}
 }
