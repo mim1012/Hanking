@@ -22,34 +22,20 @@ jobs:
         run: |
           GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -buildvcs=false -ldflags="-s -w" -o c2server .
 
-      - name: Debug SSH key format
+      - name: Deploy to VPS (ssh/scp CLI)
         run: |
-          printf '%s' "${{ secrets.VPS_SSH_KEY }}" > /tmp/deploy_key
-          echo "key_bytes=$(wc -c < /tmp/deploy_key)"
-          echo "key_lines=$(wc -l < /tmp/deploy_key)"
-          echo "key_prefix=$(head -c 30 /tmp/deploy_key)"
-
-      - name: Upload binaries to VPS
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          source: "server/c2server,c2push/c2push.py"
-          target: "/root/c2_deploy"
-
-      - name: Apply + restart services
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          script: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          SSHOPTS="-i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o IdentitiesOnly=yes"
+          scp $SSHOPTS server/c2server c2push/c2push.py ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/root/c2_deploy/
+          ssh $SSHOPTS ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} '
             set -e
             systemctl stop c2server
-            cp /root/c2_deploy/server/c2server /root/c2/c2server
-            cp /root/c2_deploy/c2push/c2push.py /root/c2/c2push.py
+            cp /root/c2_deploy/c2server /root/c2/c2server
+            cp /root/c2_deploy/c2push.py /root/c2/c2push.py
             chmod +x /root/c2/c2server
             systemctl start c2server
             systemctl restart c2push
             echo "deploy ok"
+          '
