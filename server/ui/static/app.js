@@ -436,6 +436,15 @@
       video.srcObject = stream;
       var p = video.play();
       if (p && p.catch) p.catch(function () { showPlayOverlay(video); });
+      setTimeout(function () {
+        if (rtcPC !== pc || aId !== selectedId || tok !== frameToken) return;
+        if (!video.videoWidth) {
+          try { pc.close(); } catch (e) {}
+          rtcPC = null;
+          video.srcObject = null;
+          startMSE(aId, tok);
+        }
+      }, 4000);
     };
     pc.onconnectionstatechange = function () {
       if (pc.connectionState === "failed") {
