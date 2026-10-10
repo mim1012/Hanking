@@ -339,13 +339,10 @@
         if (end >= 0.1) {
           try { v.currentTime = Math.max(0, end - 0.1); } catch (e) {}
           mseSeekDone = true;
-          if (v.paused) {
-            var p0 = v.play();
-            if (p0 && p0.catch) p0.catch(function () {});
-          }
-        } else if (v.paused === false) {
-          try { v.pause(); } catch (e) {}
         }
+        // 모바일: 버퍼 대기 중 pause 하면 네이티브 재생 아이콘에 고정됨. pause 하지 않음.
+        var p0 = v.play();
+        if (p0 && p0.catch) p0.catch(function () {});
         return;
       }
       if (end - v.currentTime > 1.0) {
@@ -436,7 +433,12 @@
       video.className = "live-video";
       video.autoplay = true; video.muted = true; video.playsInline = true;
       video.setAttribute("muted", "");
+      video.setAttribute("playsinline", "");
+      video.setAttribute("webkit-playsinline", "");
+      video.controls = false;
       video.addEventListener("loadedmetadata", function () { mseEnsurePlaying(); });
+      // 모바일: 재생 아이콘 탭도 사용자 제스처로 play()
+      video.onclick = function () { var p = video.play(); if (p && p.catch) p.catch(function(){}); };
       s.appendChild(video);
     }
     mseStopped = false;
@@ -446,6 +448,8 @@
     ms.addEventListener("sourceended", function () {});
     video.src = URL.createObjectURL(ms);
     mseMS = ms;
+    // 클릭 제스처 안에서 즉시 play() — 모바일 자동재생 잠금 해제
+    try { var up = video.play(); if (up && up.catch) up.catch(function(){}); } catch (e) {}
   }
 
   // WS push 스트림 (/admin/wsstream). 서버가 init+신규 세그먼트를 같은 바이너리
