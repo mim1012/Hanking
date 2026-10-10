@@ -35,11 +35,7 @@ func rtcTrack(agentID string) *webrtc.TrackLocalStaticSample {
 		return t
 	}
 	t, err := webrtc.NewTrackLocalStaticSample(
-		webrtc.RTPCodecCapability{
-			MimeType:    webrtc.MimeTypeH264,
-			ClockRate:   90000,
-			SDPFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f",
-		},
+		webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeH264, ClockRate: 90000},
 		"video",
 		agentID,
 	)
@@ -140,23 +136,23 @@ func handleAdminWebRTCOffer(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "track", 500)
 		return
 	}
-	if _, err := pc.AddTrack(track); err != nil {
-		pc.Close()
-		http.Error(w, "addtrack", 500)
-		return
-	}
 	if err := pc.SetRemoteDescription(webrtc.SessionDescription{
 		Type: webrtc.SDPTypeOffer,
 		SDP:  req.SDP,
 	}); err != nil {
 		pc.Close()
-		http.Error(w, "offer", 400)
+		http.Error(w, "offer: "+err.Error(), 400)
+		return
+	}
+	if _, err := pc.AddTrack(track); err != nil {
+		pc.Close()
+		http.Error(w, "addtrack: "+err.Error(), 500)
 		return
 	}
 	answer, err := pc.CreateAnswer(nil)
 	if err != nil {
 		pc.Close()
-		http.Error(w, "answer", 500)
+		http.Error(w, "answer: "+err.Error(), 500)
 		return
 	}
 	gather := webrtc.GatheringCompletePromise(pc)
