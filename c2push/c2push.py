@@ -467,7 +467,7 @@ class H264Streamer:
         self._cur = None
         self._stop = False
         tw = min(target_w, w)
-        gop = max(2, fps // 2)      # 0.5s마다 키프레임 → frag 0.5s 주기 (파이프라인 지연 ≈0.5s)
+        gop = 2                      # 저지연: 세그 주기 ≈2프레임 (15fps≈130ms). 비트레이트↑
         cmd = [FFMPEG, "-hide_banner", "-loglevel", "error",
                "-f", "rawvideo", "-pixel_format", "bgr0",
                "-video_size", f"{w}x{h}", "-framerate", str(fps), "-i", "pipe:0",
