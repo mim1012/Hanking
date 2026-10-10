@@ -441,7 +441,7 @@
       if (pc.connectionState === "failed") {
         try { pc.close(); } catch (e) {}
         if (rtcPC === pc) rtcPC = null;
-        if (aId === selectedId && tok === frameToken) pollMSE(aId, tok);
+        if (aId === selectedId && tok === frameToken) startMSE(aId, tok);
       }
     };
     pc.createOffer().then(function (offer) {
@@ -468,14 +468,16 @@
     }).catch(function () {
       try { pc.close(); } catch (e) {}
       if (rtcPC === pc) rtcPC = null;
-      if (aId === selectedId && tok === frameToken) pollMSE(aId, tok);
+      if (aId === selectedId && tok === frameToken) startMSE(aId, tok);
     });
   }
 
   function startLive(aId, tok) {
     stopMSE();
     startWebRTC(aId, tok);
-    return;
+  }
+
+  function startMSE(aId, tok) {
     if (!window.MediaSource || !MediaSource.isTypeSupported) {
       fetchFrame(aId, tok);   // JPEG 폴백
       return;
