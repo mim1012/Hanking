@@ -31,4 +31,12 @@ c2push 좌석 스레드가 생성(RFB 수신 `rfb_loop` 스레드 1개 포함)�
 - **"성공분만 전면 교체" refresh 구성** — 부분 실패가 곧 전체 좌석 증발로 번짐. 관측 기반: 패치 전 refresh 로그 좌석수 15~18대 진동 + rfb thread exit 반복, 패치 후 18→21 단조 증가·안정.
 - **rfb 스레드를 refresh 주기에 맞춰 무조건 스폰(좌석 시작 시)** — stream_start 전엔 쓸모없는 대기 스레드만 남고, 사망 후 부활 수단도 없어 무음 정체로 빠짐. stream_start 시점 온디맨드 스폰으로 교체.
 
+## 3차 확장: c2server 롱폴 이벤트 대기 + 204 백오프 (v19, 2026-10-10)
+
+프레임 생산(c2push rfb)은 정상인데 뷰어 재생이 뚝뚝 끊긴 두 번째 원인은 **서버 롱폴 대기 구조**였다: `/admin/stream` raw 모드가 init 존재 시 `len(out)==0`(신규 세그 없음)이어도 즉시 빈 200을 반환 → 브라우저가 0ms 갭으로 재요청 → 요청 폭풍+세그 사이 공백. v19: ①빈 백로그 시 wake 채널 이벤트 대기(300ms 백오프, 무부하) — `streamNotify`가 init/seg 수신부 4곳에서 브로드캐스트 ②창 끝 눕히면 **204 No Content** 반환 ③브라우저 pollMSE는 204 받으면 150ms 백오프 재폴, octet-stream 성공은 즉시(0ms) 순차 롱폴 유지.
+
+정본 구현: `c2-project/server/main.go` `handleAdminStream` rawFmt len(out)==0 분기 + `wakeChan`/`streamNotify`(wakeMu 별도 락 — streamMu 홀드 중 notify 교착 방지), `c2-project/server/ui/static/app.js` `pollMSE` 204 분기.
+
+실측(vultr, poll serve 로그): waited_ms 119~183ms(폴 요청이 세그 도착까지 홀드됨 — 이전 즉시 반환 구조 대비), 204 발화 0건(세그가 항상 1초 창 내 도착). 브라우저 E2E(OX-045, 폴레그): 첫프레임 1.06s, 스톨 0건, lag avg 0.883s/max 1.175s, 폴 갭 median 466ms, c2server CPU 5.1→5.4%(무부하 대기로 증가 없음).
+
 ## 관련: [[좌석동기화-전면재구성-와-보류-재사용]]
