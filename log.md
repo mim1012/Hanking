@@ -177,3 +177,4 @@
 - 2026-10-10 | Compile | c2push 좌석동기화 2차 결함(보류-재사용) 갱신 — C2push-rfb스레드 개념페이지에 refresh 부분실패 증발+carry-over 정책 추가
 - 2026-10-10 | Compile | c2server v19 롱폴 이벤트 대기+204 백오프 개념 갱신 — C2push-rfb스레드 개념페이지에 3차 확장 등록(실측: waited_ms 홀드/스톨0/프레임 1.06s)
 - 2026-10-10 | Compile | 좌석 계층판별 프로토콜 갱신 — C2push-rfb스레드 개념페이지에 4차 등록(roster→agent→rfb 3단계 판별, swap WS 리셋 사망류 복구 경로)
+- 2026-10-10 | Compile | c2push v41(Q1 fb-None 경합 가드 + Q2 좀비 recv-30s 재생성 차단 해제) 개념 갱신 — C2push-rfb스레드 페이지 5차 확장(실측: PC-008 poll serve segs=1..12, TypeError 0건, 45좌석 자동 재등록)

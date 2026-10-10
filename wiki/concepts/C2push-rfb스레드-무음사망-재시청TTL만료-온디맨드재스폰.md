@@ -49,4 +49,18 @@ v19 스왑(WS 일괄 리셋) 후 여러 좌석이 검은 화면·재생아이콘
 
 실측: PC-008 = ①regloop 09:20 사망→②재등록 후 rfb TypeError×3(구프로세스)→③프로세스 signal 크래시 자동재시작→④신규프로세스 정상(경로당 2회 stream_start, 대조 실험 실측) → 초록·재생 복귀. swap류 이벤트 후 정체는 py-spy 좌석 매핑이 불가(Thread 이름 generic)하므로 **저널 기반(pong/EXC/poll serve 카운트) 판별이 실무 표준**.
 
+## 5차: TTL 만료 경합 TypeError + 좀비 커맨드 스레드 재생성 차단 (v41, 2026-10-10)
+
+4차의 "c2push 재시작이 유일 복구"를 코드로 끝내가는 수정이다. 두 결함이 모두 `c2push.py`(vultr `/root/c2/c2push.py`, 수정 전 md5 4597a5fa…, after fbf7d2b7…):
+
+- **Q1 게시 경합**: `rfb_loop`가 update 수신 중이던 창에 TTL 만료 → feed_loop가 `stt.fb = None` → rfb 게시 `stt.fb[:] = rfb_fb`가 `TypeError: 'NoneType' object does not support item assignment`로 rfb 수신 스레드 자살. 수정: `if stt.fb is not None:` 가드.
+- **Q2 좀비 재생성 차단**: 좀비 seat 스레드 구조 = 커맨드 루프 `ws.settimeout(None)` 무한 차단 → SEATS에서 제거돼도 finally(`SEAT_THREADS` 해제)가 안 실행 → dispatcher `names - alive`가 항상 machine을 "alive"로 봐 **영구 재생성 불가**. 수정: recv 타임아웃 30초 + 
+  `WebSocketTimeoutException` 시 "좌석 치워짐, recv idle" 로그와 깨끗한 exit → 스레드 키 해제 →
+
+  좌석 재등장 시 dispatcher가 재스폰.
+
+- 이 재생성 경로가 10:56:34 재시작 직후 45좌석 전면 자동 재등록으로 실증됨. 배포 후 TypeScript error 0건(10:57 이후 grep 0), PC-008 E2E poll serve segs=1..12(~1.48MB/poll, 10:59+11:07 두 사이클 재측정).
+
+판별 부록: `[rfb] connect EXC <ip:port>` 라인엔 좌석명이 없어서 소속이 안 드러난다 — 좌석 매핑은 30 실패마다 나오는 `[name] rfb 연결 실패 <ip:port>` 라인으로 해야 한다(실측: 14.34.81.61:52519 = PC-061, 별도 좌석이었다).
+
 ## 관련: [[좌석동기화-전면재구성-와-보류-재사용]]
