@@ -47,11 +47,9 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           SSHOPTS="-i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o IdentitiesOnly=yes"
           ssh $SSHOPTS ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} '
-            sleep 45
-            echo "=== c2server/c2push active? ==="
-            systemctl is-active c2server; systemctl is-active c2push
-            echo "=== winhips C2 reachability ==="
-            timeout 5 bash -c "cat < /dev/null > /dev/tcp/198.13.42.105/80" 2>/dev/null && echo "198.13.42.105:80 OK" || echo "198.13.42.105:80 FAIL"
-            echo "=== c2push journal (last 100) ==="
-            journalctl -u c2push --no-pager -n 100 2>/dev/null | tail -100
+            sleep 60
+            echo "=== journalctl grep (BLANC-101|PC-115|ffmpeg|ERR|끊) ==="
+            journalctl -u c2push -n 200 --no-pager | grep -E "BLANC-101|PC-115|ffmpeg|ERR|끊"
+            echo "=== (context) BLANC-101 / PC-115 최근 40줄 ==="
+            journalctl -u c2push -n 400 --no-pager | grep -E "BLANC-101|PC-115" | tail -40
           '
