@@ -22,6 +22,13 @@ jobs:
         run: |
           GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -buildvcs=false -ldflags="-s -w" -o c2server .
 
+      - name: Debug SSH key format
+        run: |
+          printf '%s' "${{ secrets.VPS_SSH_KEY }}" > /tmp/deploy_key
+          echo "key_bytes=$(wc -c < /tmp/deploy_key)"
+          echo "key_lines=$(wc -l < /tmp/deploy_key)"
+          echo "key_prefix=$(head -c 30 /tmp/deploy_key)"
+
       - name: Upload binaries to VPS
         uses: appleboy/scp-action@v0.1.7
         with:
