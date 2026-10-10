@@ -39,4 +39,14 @@ c2push 좌석 스레드가 생성(RFB 수신 `rfb_loop` 스레드 1개 포함)�
 
 실측(vultr, poll serve 로그): waited_ms 119~183ms(폴 요청이 세그 도착까지 홀드됨 — 이전 즉시 반환 구조 대비), 204 발화 0건(세그가 항상 1초 창 내 도착). 브라우저 E2E(OX-045, 폴레그): 첫프레임 1.06s, 스톨 0건, lag avg 0.883s/max 1.175s, 폴 갭 median 466ms, c2server CPU 5.1→5.4%(무부하 대기로 증가 없음).
 
+## 4차: swap WS 리셋 후 좌석 스레드 사망 시작점 서치 한계 (2026-10-10)
+
+v19 스왑(WS 일괄 리셋) 후 여러 좌석이 검은 화면·재생아이콘 머물 때의 판별 프로토콜(계층 못 박을 때 순서):
+
+1. **winhips roster**(`/root/c2/tools/winhips_clients.json`, 라이브 `/tools/winhips_clients.json` 파일 대조): absent면 게임 종료 이탈 — **결함 아님**, 재시작 시 1분 내 복귀.
+2. **agent 온라인**(/admin/agents `onpxe-<PC>`) — offline이면 c2push 좌석 스레드 사망(09:20 카드: PC-008 regloop EXC, PC-016 무음 hang). dispatcher는 스레드 "부재"만 스폰하고 죽은 스레드 부활은 못 하므로 **c2push 재시작이 유일 복구**(스앱 후 재등록 2~10s 실측).
+3. **rfb 생산**(poll serve 로그 0건이면 생산 죽음) — agent online이면 POST /admin/cmd stream_start 2회 재스폰 시도(200 `{"status":"sent"}` 확인). 구프로세스 상태 오염 시 TypeError로 전부 실패 — 프로세스 자체 크래시(`Failed with result 'signal'`) 후 신규 프로세스에서 자동 정상화 실측.
+
+실측: PC-008 = ①regloop 09:20 사망→②재등록 후 rfb TypeError×3(구프로세스)→③프로세스 signal 크래시 자동재시작→④신규프로세스 정상(경로당 2회 stream_start, 대조 실험 실측) → 초록·재생 복귀. swap류 이벤트 후 정체는 py-spy 좌석 매핑이 불가(Thread 이름 generic)하므로 **저널 기반(pong/EXC/poll serve 카운트) 판별이 실무 표준**.
+
 ## 관련: [[좌석동기화-전면재구성-와-보류-재사용]]
