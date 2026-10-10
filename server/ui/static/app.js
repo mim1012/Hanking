@@ -389,6 +389,7 @@
     mseCurStream = -1;
     mseSinceSeq = -1;
     mseSeekDone = false;
+    if (rtcPC) { try { rtcPC.close(); } catch (e) {} rtcPC = null; }
     if (mseWS) {
       // 의도적 종료 — 핸들러를 먼저 지운야 폴백(pollMSE)이 발동하지 않음
       try { mseWS.onclose = null; mseWS.onerror = null; mseWS.onmessage = null; mseWS.close(); } catch (e) {}
@@ -407,8 +408,74 @@
     if (v) { try { v.pause(); } catch (e) {} v.removeAttribute("src"); try { v.load(); } catch (e) {} }
   }
 
+
+  var rtcPC = null;
+  function startWebRTC(aId, tok) {
+    var s = document.getElementById("live-screen");
+    var video = s.querySelector("video.live-video");
+    if (!video) {
+      s.innerHTML = "";
+      video = document.createElement("video");
+      video.className = "live-video";
+      video.autoplay = true; video.muted = true; video.playsInline = true;
+      video.setAttribute("muted", "");
+      video.setAttribute("playsinline", "");
+      video.setAttribute("webkit-playsinline", "");
+      video.controls = false;
+      video.onclick = function () { var p = video.play(); if (p && p.catch) p.catch(function(){}); };
+      s.style.position = "relative";
+      s.appendChild(video);
+    }
+    if (typeof RTCPeerConnection === "undefined") { pollMSE(aId, tok); return; }
+    var pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] });
+    rtcPC = pc;
+    pc.addTransceiver("video", { direction: "recvonly" });
+    pc.ontrack = function (ev) {
+      if (aId !== selectedId || tok !== frameToken) return;
+      var stream = (ev.streams && ev.streams[0]) || new MediaStream([ev.track]);
+      video.srcObject = stream;
+      var p = video.play();
+      if (p && p.catch) p.catch(function () { showPlayOverlay(video); });
+    };
+    pc.onconnectionstatechange = function () {
+      if (pc.connectionState === "failed") {
+        try { pc.close(); } catch (e) {}
+        if (rtcPC === pc) rtcPC = null;
+        if (aId === selectedId && tok === frameToken) pollMSE(aId, tok);
+      }
+    };
+    pc.createOffer().then(function (offer) {
+      return pc.setLocalDescription(offer);
+    }).then(function () {
+      return new Promise(function (res) {
+        if (pc.iceGatheringState === "complete") return res();
+        var done = false;
+        pc.onicegatheringstatechange = function () {
+          if (!done && pc.iceGatheringState === "complete") { done = true; res(); }
+        };
+        setTimeout(function () { if (!done) { done = true; res(); } }, 1500);
+      });
+    }).then(function () {
+      return api("/admin/webrtc/offer", { method: "POST", json: { agent_id: aId, sdp: pc.localDescription.sdp } });
+    }).then(function (j) {
+      if (!j || !j.sdp) throw new Error("no answer");
+      return pc.setRemoteDescription({ type: "answer", sdp: j.sdp });
+    }).then(function () {
+      if (Date.now() - lastStreamCmdAt > 15000) {
+        lastStreamCmdAt = Date.now();
+        sendCmd(aId, "stream_start", JSON.stringify({ fps: 24, quality: 70, max_dim: 1280 }));
+      }
+    }).catch(function () {
+      try { pc.close(); } catch (e) {}
+      if (rtcPC === pc) rtcPC = null;
+      if (aId === selectedId && tok === frameToken) pollMSE(aId, tok);
+    });
+  }
+
   function startLive(aId, tok) {
     stopMSE();
+    startWebRTC(aId, tok);
+    return;
     if (!window.MediaSource || !MediaSource.isTypeSupported) {
       fetchFrame(aId, tok);   // JPEG 폴백
       return;
