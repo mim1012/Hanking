@@ -306,13 +306,13 @@
     var s = document.getElementById("live-screen");
     var v = s ? s.querySelector("video.live-video") : null;
     if (!v) return;
-    // 시작 시 1.2s 버퍼 축적까지 재생 시작 보류 → 이후 배치 버스트를 흡수해 끊김 방지(딜레≈1.2초)
-    // 이후 2.0s 이상 밀리면 끝-1.2s 위치로 재동기화 (버퍼 상시 1.2s 여유 — 딜레이≤1.2초 정착)
+    // 시작 시 0.3s 버퍼 축적까지 재생 시작 보류 → 이후 배치 버스트를 흡수해 끊김 방지(딜레≈0.3초)
+    // 이후 2.0s 이상 밀리면 끝-0.3s 위치로 재동기화 (버퍼 상시 0.3s 여유)
     if (v.buffered.length) {
       var end = v.buffered.end(v.buffered.length - 1);
       if (!mseSeekDone) {
-        if (end >= 1.2) {
-          try { v.currentTime = Math.max(0, end - 1.2); } catch (e) {}
+        if (end >= 0.3) {
+          try { v.currentTime = Math.max(0, end - 0.3); } catch (e) {}
           mseSeekDone = true;
           if (v.paused) {
             var p0 = v.play();
@@ -323,8 +323,8 @@
         }
         return;
       }
-      if (end - v.currentTime > 2.0) {
-        try { v.currentTime = Math.max(0, end - 1.2); } catch (e) {}
+      if (end - v.currentTime > 1.0) {
+        try { v.currentTime = Math.max(0, end - 0.3); } catch (e) {}
       }
     }
     if (v.paused && mseSeekDone) {
@@ -402,11 +402,12 @@
     // 뷰어 무응답(검정/멈춤)의 주요 원인 — WS 폰 계속 열어두고 대기하는 것보다 안전.
     var wdg = setInterval(function () {
       if (mseWS !== ws || mseStopped || aId !== selectedId || tok !== frameToken) { clearInterval(wdg); return; }
-      if (Date.now() - mseLastAppend > 15000) {
+      // init만 오고 media가 없으면 3초 안에 롱폴로 폴백 (재생 아이콘만 뜨는 주원인)
+      if (Date.now() - mseLastAppend > 3000) {
         clearInterval(wdg);
         wsFallback(aId, tok, ws);
       }
-    }, 1000);
+    }, 500);
     var ka = setInterval(function () {
       if (mseWS !== ws || mseStopped || aId !== selectedId || tok !== frameToken) { clearInterval(ka); return; }
       if (Date.now() - lastStreamCmdAt > 15000) { lastStreamCmdAt = Date.now(); sendCmd(aId, "stream_start", JSON.stringify({ fps: 15, quality: 70, max_dim: 1280 })); }
