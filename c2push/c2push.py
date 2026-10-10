@@ -246,7 +246,7 @@ def refresh_seats():
 def refresh_loop():
     refresh_seats()
     while True:
-        REFRESH_EVENT.wait(timeout=60)   # 300s → 60s: 좌석 소스를 winhips live 상태에 준실시간 동기화
+        REFRESH_EVENT.wait(timeout=10)   # 10s: 뷰어 장비목록 준실시간 동기화
         REFRESH_EVENT.clear()
         refresh_seats()
 
