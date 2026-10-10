@@ -1,12 +1,74 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "opencode/deepseek-v4-flash-free",
-  "provider": {
-    "openrouter": {
+  "model": "lmstudio/qwen/qwen3-coder-30b",
+  "default_agent": "build",
+  "agents": {
+    "build": {
+      "description": "Lightweight Korean coding agent for the local LM Studio model",
+      "mode": "primary",
+      "model": "lmstudio/qwen/qwen3-coder-30b",
+      "steps": 20,
+      "system": "You are a concise local coding agent. Work only in the active project. Respond in Korean. Inspect only relevant files, make focused edits, run verification, and report honestly. Use read, glob, grep, edit, and shell tools when needed. Do not repeat failed commands or invent files.",
+      "permissions": [
+        { "action": "*", "resource": "*", "effect": "deny" },
+        { "action": "read", "resource": "*", "effect": "allow" },
+        { "action": "glob", "resource": "*", "effect": "allow" },
+        { "action": "grep", "resource": "*", "effect": "allow" },
+        { "action": "edit", "resource": "*", "effect": "allow" },
+        { "action": "shell", "resource": "*", "effect": "allow" }
+      ]
+    },
+    "title": {
+      "disabled": true
+    },
+    "summary": {
+      "disabled": true
+    },
+    "compaction": {
+      "disabled": true
+    }
+  },
+  "providers": {
+    "lmstudio": {
+      "settings": {
+        "baseURL": "http://127.0.0.1:1234/v1"
+      },
       "models": {
-        "deepseek/deepseek-v4-flash": {},
-        "deepseek/deepseek-chat": {},
-        "moonshotai/kimi-k2-thinking": {}
+        "qwen/qwen3-30b-a3b-2507": {
+          "modelID": "qwen3-8b-agent",
+          "name": "Qwen3 8B Agent (LM Studio)",
+          "capabilities": {
+            "tools": true,
+            "input": ["text"],
+            "output": ["text"]
+          },
+          "compatibility": {
+            "reasoningField": "reasoning_content"
+          },
+          "body": {
+            "reasoning_effort": "none"
+          },
+          "limit": {
+            "context": 32768,
+            "output": 4096
+          }
+        },
+        "qwen/qwen3-coder-30b": {
+          "modelID": "qwen-ablit-agent",
+          "name": "Qwen3.8 27B Abliterated (LM Studio)",
+          "capabilities": {
+            "tools": true,
+            "input": ["text"],
+            "output": ["text"]
+          },
+          "compatibility": {
+            "reasoningField": "reasoning_content"
+          },
+          "limit": {
+            "context": 8192,
+            "output": 1024
+          }
+        }
       }
     }
   }

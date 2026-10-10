@@ -52,7 +52,7 @@ func runAsService() bool {
 	}
 	// Impersonate via SCM-check: svc.Run returns an error quickly when we are
 	// NOT actually started by the Service Control Manager.
-	svcName := "DocViewerHelper"
+	svcName := xob(eSvcName)
 	if err := svc.Run(svcName, &agentService{}); err != nil {
 		return false
 	}

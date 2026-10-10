@@ -112,14 +112,6 @@ func pushStreamFrame() error {
 	if !streamEnabled() {
 		return fmt.Errorf("stream disabled")
 	}
-	// Gate mirrors the screenshot/stream command gate: frames only flow while a
-	// §3-1 client is active, unless FORCE_STREAM=1 (lab override).
-	if os.Getenv(xob(eForceStream)) != "1" {
-		if !scanGames().StreamEnable {
-			return fmt.Errorf("stream_gated: game_active=false")
-		}
-	}
-
 	frameNo := atomic.AddUint64(&streamFrameN, 1)
 	raw, mime, err := captureCurrentFrame()
 	if err != nil {

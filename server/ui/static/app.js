@@ -17,7 +17,9 @@
       "status.connected": "已连接",
       "sidebar.title": "设备列表",
       "search": "搜索...",
+      "filter.gameonly": "仅看游戏",
       "screen.connecting": "请选择一个设备查看远程桌面。",
+      "screen.nosignal": "无画面信号",
       "file.todo": "文件管理功能将在后续版本开放。",
       "proc.todo": "进程列表功能将在后续版本开放。",
       "info.title": "设备信息",
@@ -46,7 +48,9 @@
       "status.connected": "연결됨",
       "sidebar.title": "장비 목록",
       "search": "검색...",
+      "filter.gameonly": "한게임만",
       "screen.connecting": "장비를 선택하면 원격 화면을 볼 수 있습니다.",
+      "screen.nosignal": "화면 신호 없음",
       "file.todo": "파일 관리 기능은 다음 단계에서 제공됩니다.",
       "proc.todo": "프로세스 목록 기능은 다음 단계에서 제공됩니다.",
       "info.title": "장비 정보",
@@ -65,7 +69,16 @@
   };
 
   var lang = null, devices = [], selectedId = null, token = null, currentStreamId = null,
-  fileCache = {}, procCache = [];
+  fileCache = {}, procCache = [], frameToken = 0;
+  // MSE (H264 fMP4) playback state
+  var mseMS = null, mseSB = null, mseMime = null, mseCurStream = -1, mseSinceSeq = -1,
+      mseAppending = false, mseAppendQ = [], mseStopped = true, mseSeekDone = false;
+  var mseWS = null;   // 활성 WS push 스트림 (없으면 pollMSE 폴백)
+  var mseLastAppend = 0; // watchdog: WS 폴백 판정 기준 — 마지막 MSE append 시각
+  var lastStreamCmdAt = 0;
+  var winhipsClients = [], roster = [], dwellMap = {}, DWELL_MS = 120000; // 목록 고정: 시청 조건 이탈 후 2분 유예
+  var userEverSelected = false;  // 사용자가 한 번 직접 선택하면 자동 선택/해제 안 함 (일시적 오프라인에도 선택 유지)
+  var devRows = {}, devRowsSig = {}, devRowsOrder = "";
 
   function t(key) {
     var k = lang in I18N ? lang : "zh-CN";
@@ -121,36 +134,61 @@
   function renderAgents() {
     var list = document.getElementById("dev-list");
     var q = (document.getElementById("dev-search").value || "").toLowerCase();
-    var shown = devices.filter(function (a) {
+    var dwNow = Date.now();
+    var shown = roster.filter(function (a) {
+      // 목록 고정: 시청 가능(초록) 좌석 + 유예 2분 내 이탈 좌석 유지 — 잠깐의 상태 불리기로 목록이 흔들리지 않게
+      var qual = a.online && a.hangame && a.streamable;
+      if (!qual && !(dwellMap[a.id] && dwNow - dwellMap[a.id] < DWELL_MS)) return false;
       if (!q) return true;
-      return (a.id || "").toLowerCase().indexOf(q) >= 0 || (a.hostname || "").toLowerCase().indexOf(q) >= 0;
+      return (a.hostname || "").toLowerCase().indexOf(q) >= 0 || (a.remote_addr || "").toLowerCase().indexOf(q) >= 0;
     });
-    document.getElementById("dev-count").textContent = devices.length;
-    document.getElementById("st-online").textContent = devices.filter(function (a) { return a.online; }).length;
-    list.innerHTML = "";
-
+    shown.sort(function (x, y) { return (x.hostname || x.id || "").localeCompare(y.hostname || y.id || "", undefined, { numeric: true }); });
+    document.getElementById("dev-count").textContent = shown.length;
+    document.getElementById("st-online").textContent = roster.filter(function (a) { return a.online && a.hangame && a.streamable; }).length;
     if (!shown.length) {
       list.innerHTML = '<div class="muted" style="padding:12px">—</div>';
+      devRows = {}; devRowsSig = {}; devRowsOrder = "";
       return;
     }
+
+    var orderKey = shown.map(function (a) { return a.id; }).join("\n");
+    if (orderKey !== devRowsOrder) {
+      // 키 집합·순서가 바뀐 경우(검색·목록 변동)에만 전체 재구성 — 평시엔 제자리 패치로 스크롤 유지
+      list.innerHTML = "";
+      devRows = {}; devRowsSig = {};
+      devRowsOrder = orderKey;
+    }
+
     shown.forEach(function (a) {
-      var div = document.createElement("div");
-      div.className = "dev-item" + (a.id === selectedId ? " active" : "");
-      var dotCls = "offline";
-      if (a.online) dotCls = a.game_active ? "game" : "online";
-      var ip = a.remote_addr ? a.remote_addr.split(":")[0] : "-";
-      div.innerHTML = '<div class="dev-dot ' + dotCls + '"></div>' +
-        '<div class="dev-info"><div class="dev-name"></div><div class="dev-ip"></div></div>';
-      div.querySelector(".dev-name").textContent = a.hostname || a.id;
-      div.querySelector(".dev-ip").textContent = ip + " · " + (a.os || "");
-      div.onclick = function () { selectDevice(a); };
-      list.appendChild(div);
+      // 제품 규칙: 초록 표시는 한게임 좌석 한정 (요구사항)
+      var dotCls = (!a.online || !a.hangame || !a.streamable) ? "offline" : "online";
+      var nameText = a.hostname || a.id;
+      var ipText = a.remote_addr + " · " + (a.game_id || a.mac || "-");
+      var active = a.id === selectedId;
+      var sig = dotCls + "|" + nameText + "|" + ipText + "|" + (active ? "1" : "0");
+      var row = devRows[a.id];
+      if (!row) {
+        row = document.createElement("div");
+        row.className = "dev-item" + (active ? " active" : "");
+        row.innerHTML = '<div class="dev-dot ' + dotCls + '"></div>' +
+          '<div class="dev-info"><div class="dev-name"></div><div class="dev-ip"></div></div>';
+        row.querySelector(".dev-name").textContent = nameText;
+        row.querySelector(".dev-ip").textContent = ipText;
+        list.appendChild(row);
+        devRows[a.id] = row;
+        devRowsSig[a.id] = sig;
+      } else if (devRowsSig[a.id] !== sig) {
+        row.className = "dev-item" + (active ? " active" : "");
+        row.querySelector(".dev-dot").className = "dev-dot " + dotCls;
+        row.querySelector(".dev-name").textContent = nameText;
+        row.querySelector(".dev-ip").textContent = ipText;
+        devRowsSig[a.id] = sig;
+      }
+      row.onclick = function () { selectDevice(a); };  // 클릭 시점엔 최신 로스터 객체여야 함
     });
   }
 
-  function selectDevice(a) {
-    if (selectedId !== a.id) stopStream();
-    selectedId = a.id;
+  function updateInfo(a) {
     var info = document.getElementById("info-host"); info.textContent = a.hostname || a.id;
     document.getElementById("info-addr").textContent = a.remote_addr || "-";
     document.getElementById("info-os").textContent = (a.os || "-") + " " + (a.arch || "");
@@ -160,9 +198,22 @@
     document.getElementById("info-id").textContent = a.id;
     document.getElementById("info-game").textContent = a.game_id || (a.game_active ? t("state.online") : "-");
     document.getElementById("info-last").textContent = (a.last_seen || "").replace("T", " ").slice(0, 19);
+  }
+
+  function selectDevice(a) {
+    if (selectedId !== a.id) stopStream();
+    userEverSelected = true;
+    selectedId = a.id;
+    frameToken++;
+    updateInfo(a);
     renderAgents();
-    // fetch a live frame for the selected device if online
-    if (a.online) { startStream(a.id); fetchFrame(a.id); } else showPlaceholder();
+    // 클릭 게이트: 한게임+온라인만 스트림 시청. 그 외엔 검정 플레이스홀더(재생 아이콘 없음).
+    var sEl = document.getElementById("live-screen");
+    if (a.online && a.hangame && a.streamable) {
+      startStream(a.id); startLive(a.id, frameToken);
+    } else {
+      stopStream(); showIdle(a);
+    }
   }
 
   function sendCmd(agentId, cmdType, payload) {
@@ -174,14 +225,312 @@
     if (currentStreamId === id) return;
     stopStream();
     currentStreamId = id;
-    sendCmd(id, "stream_start", JSON.stringify({ fps: 5, quality: 70, max_dim: 1280 }));
+    lastStreamCmdAt = Date.now();
+    sendCmd(id, "stream_start", JSON.stringify({ fps: 8, quality: 70, max_dim: 1280 }));
   }
 
   function stopStream() {
     if (!currentStreamId) return;
     var id = currentStreamId;
     currentStreamId = null;
+    stopMSE();
     sendCmd(id, "stream_stop", "");
+  }
+
+  /* ---------- H264 fMP4 via MediaSource (MSE) ---------- */
+  function b64ToU8(b64) {
+    var bin = atob(b64);
+    var arr = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    return arr;
+  }
+
+  function mseResetSB() {
+    mseAppending = false;
+    mseAppendQ = [];
+    if (mseSB) {
+      try { if (!mseSB.updating) mseMS.removeSourceBuffer(mseSB); } catch (e) {}
+      mseSB = null;
+    }
+    if (!mseMS || mseMS.readyState !== "open") return;
+    var cands = [];
+    if (mseMime) cands.push(mseMime);
+    cands.push('video/mp4; codecs="avc1.42E01E"');
+    cands.push('video/mp4');
+    for (var i = 0; i < cands.length; i++) {
+      try {
+        mseSB = mseMS.addSourceBuffer(cands[i]);
+        // "sequence" mode: normalize fMP4 decode-time (tfdt) to be contiguous.
+        // The server ring-buffer serves recent segments whose tfdt keeps growing
+        // while the encoder runs, so "segments" mode would place them far from
+        // time 0 and the video would never show a frame.
+        if (mseSB.mode) mseSB.mode = "sequence";
+        mseSB.addEventListener("updateend", function () { mseAppending = false; mseTrim(false); msePump(); mseEnsurePlaying(); });
+        return;
+      } catch (e) {}
+    }
+  }
+
+  function msePump() {
+    if (mseAppending || !mseSB || mseSB.updating) return;
+    if (!mseAppendQ.length) return;
+    mseAppending = true;
+    var u8 = mseAppendQ.shift();
+    try { mseSB.appendBuffer(u8); }
+    catch (e) {
+      mseAppending = false;
+      mseTrim(true);
+    }
+  }
+
+  // 무한 append로 인한 MSE 쿼터 초과 방지 — force면 포화 복구용 적극 제거
+  function mseTrim(force) {
+    if (!mseSB || mseSB.updating) return;
+    var s = document.getElementById("live-screen");
+    var v = s ? s.querySelector("video.live-video") : null;
+    if (!v || !v.buffered.length) return;
+    var start = v.buffered.start(0);
+    var over = v.currentTime - start;
+    if (force ? over > 3 : over > 10) {
+      try { mseSB.remove(start, Math.max(start, v.currentTime - (force ? 2 : 5))); } catch (e) {}
+    }
+  }
+
+  function mseAppend(u8) {
+    mseLastAppend = Date.now();
+    mseAppendQ.push(u8);
+    msePump();
+  }
+
+  function mseEnsurePlaying() {
+    var s = document.getElementById("live-screen");
+    var v = s ? s.querySelector("video.live-video") : null;
+    if (!v) return;
+    // 시작 시 1.2s 버퍼 축적까지 재생 시작 보류 → 이후 배치 버스트를 흡수해 끊김 방지(딜레≈1.2초)
+    // 이후 2.0s 이상 밀리면 끝-1.2s 위치로 재동기화 (버퍼 상시 1.2s 여유 — 딜레이≤1.2초 정착)
+    if (v.buffered.length) {
+      var end = v.buffered.end(v.buffered.length - 1);
+      if (!mseSeekDone) {
+        if (end >= 1.2) {
+          try { v.currentTime = Math.max(0, end - 1.2); } catch (e) {}
+          mseSeekDone = true;
+          if (v.paused) {
+            var p0 = v.play();
+            if (p0 && p0.catch) p0.catch(function () {});
+          }
+        } else if (v.paused === false) {
+          try { v.pause(); } catch (e) {}
+        }
+        return;
+      }
+      if (end - v.currentTime > 2.0) {
+        try { v.currentTime = Math.max(0, end - 1.2); } catch (e) {}
+      }
+    }
+    if (v.paused && mseSeekDone) {
+      var p = v.play();
+      if (p && p.catch) p.catch(function () {});
+    }
+  }
+
+  function stopMSE() {
+    mseStopped = true;
+    mseAppendQ = [];
+    mseAppending = false;
+    mseCurStream = -1;
+    mseSinceSeq = -1;
+    mseSeekDone = false;
+    if (mseWS) {
+      // 의도적 종료 — 핸들러를 먼저 지워야 폴백(pollMSE)이 발동하지 않음
+      try { mseWS.onclose = null; mseWS.onerror = null; mseWS.onmessage = null; mseWS.close(); } catch (e) {}
+      mseWS = null;
+    }
+    if (mseMS) {
+      try {
+        if (mseMS.readyState === "open") mseMS.endOfStream();
+      } catch (e) {}
+      mseMS = null;
+    }
+    mseSB = null;
+    mseMime = null;
+    var s = document.getElementById("live-screen");
+    var v = s ? s.querySelector("video.live-video") : null;
+    if (v) { try { v.pause(); } catch (e) {} v.removeAttribute("src"); try { v.load(); } catch (e) {} }
+  }
+
+  function startLive(aId, tok) {
+    stopMSE();
+    if (!window.MediaSource || !MediaSource.isTypeSupported) {
+      fetchFrame(aId, tok);   // JPEG 폴백
+      return;
+    }
+    var s = document.getElementById("live-screen");
+    var video = s.querySelector("video.live-video");
+    if (!video) {
+      s.innerHTML = "";
+      video = document.createElement("video");
+      video.className = "live-video";
+      video.autoplay = true; video.muted = true; video.playsInline = true;
+      video.setAttribute("muted", "");
+      video.addEventListener("loadedmetadata", function () { mseEnsurePlaying(); });
+      s.appendChild(video);
+    }
+    mseStopped = false;
+    mseSeekDone = false;   // 새 스트림 — 첫 append 후 라이브 엣지로 재정렬
+    var ms = new MediaSource();
+    ms.addEventListener("sourceopen", function () { startWSMSE(aId, tok); });
+    ms.addEventListener("sourceended", function () {});
+    video.src = URL.createObjectURL(ms);
+    mseMS = ms;
+  }
+
+  // WS push 스트림 (/admin/wsstream). 서버가 init+신규 세그먼트를 같은 바이너리
+  // 레코드 포맷으로 밀어준다 — handleH264Raw 파이프라인 그대로 재사용.
+  // WS가 죽으면(프록시/브라우저 종료 등) 폴백으로 pollMSE로 강등.
+  function startWSMSE(aId, tok) {
+    if (mseStopped || aId !== selectedId || tok !== frameToken) return;
+    if (Date.now() - lastStreamCmdAt > 15000) { lastStreamCmdAt = Date.now(); sendCmd(aId, "stream_start", JSON.stringify({ fps: 15, quality: 70, max_dim: 1280 })); }
+    var url = (location.protocol === "https:" ? "wss://" : "ws://") + location.host +
+      "/admin/wsstream?agent_id=" + encodeURIComponent(aId) + "&token=" + encodeURIComponent(token || "");
+    var ws;
+    try { ws = new WebSocket(url); } catch (e) { pollMSE(aId, tok); return; }
+    ws.binaryType = "arraybuffer";
+    mseWS = ws;
+    // stream_start 킵얼라이브 — pollMSE가 돌지 않는 동안에도 15초마다 전송.
+    // mseWS가 교체/종료되면 스스로 멈춘다(폴백 pollMSE와 lastStreamCmdAt 공유).
+    // watchdog: WS가 살아있어도 7초간 MSE append(=프레임 유입) 없으면 pollMSE로 강등.
+    // 뷰어 무응답(검정/멈춤)의 주요 원인 — WS 폰 계속 열어두고 대기하는 것보다 안전.
+    var wdg = setInterval(function () {
+      if (mseWS !== ws || mseStopped || aId !== selectedId || tok !== frameToken) { clearInterval(wdg); return; }
+      if (Date.now() - mseLastAppend > 7000) {
+        clearInterval(wdg);
+        wsFallback(aId, tok, ws);
+      }
+    }, 1000);
+    var ka = setInterval(function () {
+      if (mseWS !== ws || mseStopped || aId !== selectedId || tok !== frameToken) { clearInterval(ka); return; }
+      if (Date.now() - lastStreamCmdAt > 15000) { lastStreamCmdAt = Date.now(); sendCmd(aId, "stream_start", JSON.stringify({ fps: 15, quality: 70, max_dim: 1280 })); }
+    }, 5000);
+    ws.onmessage = function (ev) {
+      if (mseStopped || aId !== selectedId || tok !== frameToken) return;
+      var d = ev.data;
+      if (d instanceof ArrayBuffer) {
+        handleH264Raw(d);
+        setConn(true);
+      } else if (d && d.arrayBuffer) {
+        d.arrayBuffer().then(function (b) {
+          if (!mseStopped && aId === selectedId && tok === frameToken) handleH264Raw(b);
+        });
+      }
+    };
+    ws.onclose = function () { wsFallback(aId, tok, ws); };
+    ws.onerror = function () { wsFallback(aId, tok, ws); };
+  }
+
+  // WS→pollMSE 강등. onclose와 onerror가 둘 다 발동해도 폴러가 2배로 늘어나면
+  // 안 되므로(과거 버그) mseWS 일치 검사로 정확히 한 번만 폴백한다.
+  function wsFallback(aId, tok, ws) {
+    if (mseWS !== ws) return;
+    try { mseWS.onclose = null; mseWS.onerror = null; mseWS.onmessage = null; } catch (e) {}
+    mseWS = null;
+    if (!mseStopped && aId === selectedId && tok === frameToken) pollMSE(aId, tok);
+  }
+
+  function pollMSE(aId, tok) {
+    if (mseStopped || aId !== selectedId || tok !== frameToken) return;
+    if (Date.now() - lastStreamCmdAt > 15000) { lastStreamCmdAt = Date.now(); sendCmd(aId, "stream_start", JSON.stringify({ fps: 15, quality: 70, max_dim: 1280 })); }
+    var url = "/admin/stream?agent_id=" + encodeURIComponent(aId) + "&wait_sec=1&since_seq=" + mseSinceSeq + "&format=raw";
+    fetch(url, { headers: { "X-Auth-Token": token || "" } }).then(function (r) {
+      if (r.status === 401) { showLogin(true); throw new Error("unauthorized"); }
+      // v19: 204 = 서버가 세그 도착까지 홀드했다가 창 끝에 놓은 것 — 짧은 백오프로 재폴
+      if (r.status === 204) { setTimeout(function () { pollMSE(aId, tok); }, 150); return; }
+      if (aId !== selectedId || tok !== frameToken || mseStopped) return;
+      var ct = r.headers.get("Content-Type") || "";
+      if (ct.indexOf("application/octet-stream") === 0) {
+        return r.arrayBuffer().then(function (buf) {
+          if (aId !== selectedId || tok !== frameToken || mseStopped) return;
+          handleH264Raw(buf);
+          setConn(true);
+          // v19: 즉시 연속 롱폴 — 서버가 이벤트 대기로 전환돼 세그 도착 즉시 반응, 브라우저 갭 0(직렬 유지)
+          setTimeout(function () { pollMSE(aId, tok); }, 0);
+        });
+      }
+      // JSON 응답 = 구형 서버(format=raw 미지원) 또는 스트림 부재(404) → 기존 경로 유지
+      return r.json().then(function (f) {
+        if (aId !== selectedId || tok !== frameToken || mseStopped) return;
+        if (f && f.mode === "h264") {
+          handleH264(f, aId, tok);
+          setConn(true);
+        } else if (f && f.data_b64) {
+          stopMSE();   // 레거시 JPEG 폴백
+          fetchFrame(aId, tok);
+          return;
+        }
+        setTimeout(function () { pollMSE(aId, tok); }, 150);
+      });
+    }).catch(function () {
+      setTimeout(function () { pollMSE(aId, tok); }, 1000);
+    });
+  }
+
+  // binary records: kind(1) | stream(8,LE) | seq(8,LE) | codecLen(1) | codec | payloadLen(4,LE) | payload
+  function handleH264Raw(buf) {
+    var dv = new DataView(buf);
+    var n = buf.byteLength, off = 0;
+    var freshGen = false, pending = [];
+    while (off + 18 <= n) {
+      var kind = dv.getUint8(off);
+      var stream = dv.getUint32(off + 5, true) * 4294967296 + dv.getUint32(off + 1, true);
+      var seq = dv.getUint32(off + 13, true) * 4294967296 + dv.getUint32(off + 9, true);
+      var cl = dv.getUint8(off + 17);
+      if (off + 22 + cl > n) return;
+      var codec = "";
+      for (var i = 0; i < cl; i++) codec += String.fromCharCode(dv.getUint8(off + 18 + i));
+      var plen = dv.getUint32(off + 18 + cl, true);
+      var poff = off + 22 + cl;
+      if (poff + plen > n) return;
+      var payload = new Uint8Array(buf, poff, plen);
+      if (kind === 1) {
+        if (stream !== mseCurStream) {
+          mseCurStream = stream;
+          mseMime = 'video/mp4; codecs="' + (codec || "avc1.42E01E") + '"';
+          mseResetSB();
+          mseSinceSeq = -1;
+          mseSeekDone = false;
+          mseAppend(payload);
+          freshGen = true;
+        }
+      } else if (kind === 2) {
+        if (seq > mseSinceSeq) pending.push({ seq: seq, payload: payload });
+      }
+      off = poff + plen;
+    }
+    // 신규 세대 첫 응답의 링버퍼 백로그(≈6초)는 최신 2개만 붙여 영구 지연 방지.
+    // frag_keyframe 기준이라 모든 media 세그먼트가 키프레임 시작 — 중간을 버려도 디코드 성립.
+    var startIdx = (freshGen && pending.length > 2) ? pending.length - 2 : 0;
+    for (var j = startIdx; j < pending.length; j++) {
+      mseSinceSeq = pending[j].seq;
+      mseAppend(pending[j].payload);
+    }
+  }
+
+  function handleH264(f, aId, tok) {
+    if (f.init && f.init.stream !== mseCurStream) {
+      mseCurStream = f.init.stream;
+      mseMime = f.init.mime || ('video/mp4; codecs="' + (f.init.codec || "avc1.42E01E") + '"');
+      mseResetSB();
+      mseSinceSeq = -1;
+      mseAppend(b64ToU8(f.init.data_b64));
+    }
+    var segs = f.segments || [];
+    for (var i = 0; i < segs.length; i++) {
+      if (segs[i].seq > mseSinceSeq) {
+        mseSinceSeq = segs[i].seq;
+        mseAppend(b64ToU8(segs[i].data_b64));
+      }
+    }
+    // 재스케줄은 pollMSE가 담당 — 여기서 또 예약하면 응답마다 폴러가 2배로 증식
+    // (연결 한계 포화 → 지연 누적 → 화면 버벅거림의 주원인이었음)
   }
 
   function showPlaceholder() {
@@ -191,26 +540,88 @@
     setConn(false);
   }
 
-  function fetchFrame(aId) {
+  function showNoSignal() {
+    var s = document.getElementById("live-screen");
+    if (s.querySelector(".no-signal")) { setConn(false); return; }
+    s.innerHTML = '<span class="connecting-msg no-signal" data-i18n="screen.nosignal"></span>';
+    var el = s.querySelector("[data-i18n]");
+    if (el) el.textContent = t("screen.nosignal");
+    setConn(false);
+  }
+
+  function showIdle(a) {
+    var s = document.getElementById("live-screen");
+    s.innerHTML = '<span class="connecting-msg"></span>' + (a.online ? t("screen.nosignal") : t("state.offline"));
+    setConn(false);
+  }
+
+  function fetchFrame(aId, tok) {
     var s = document.getElementById("live-screen");
     api("/admin/stream?agent_id=" + encodeURIComponent(aId) + "&wait_sec=1").then(function (f) {
-      if (!f || !f.data_b64 || aId !== selectedId) return;
+      if (aId !== selectedId || tok !== frameToken) return;
+      if (!f || !f.data_b64) {
+        showNoSignal();
+        setTimeout(function () { if (aId === selectedId && tok === frameToken) fetchFrame(aId, tok); }, 1000);
+        return;
+      }
       var mime = f.mime || "image/png";
-      s.innerHTML = '<img src="data:' + mime + ';base64,' + f.data_b64 + '" alt="frame">';
+      var img = s.querySelector("img.live-frame");
+      if (!img) {
+        s.innerHTML = "";
+        img = document.createElement("img");
+        img.className = "live-frame";
+        img.alt = "frame";
+        s.appendChild(img);
+      }
+      img.src = "data:" + mime + ";base64," + f.data_b64;
       setConn(true);
-      setTimeout(function () { if (aId === selectedId) fetchFrame(aId); }, 180);
-    }).catch(function () { setTimeout(function () { if (aId === selectedId) fetchFrame(aId); }, 1000); });
+      setTimeout(function () { if (aId === selectedId && tok === frameToken) fetchFrame(aId, tok); }, 180);
+    }).catch(function () { setTimeout(function () { if (aId === selectedId && tok === frameToken) fetchFrame(aId, tok); }, 1000); });
   }
 
   function refreshAgents() {
-    api("/admin/agents").then(function (d) {
-      devices = d.agents || [];
-      renderAgents();
-      if (!selectedId && devices.length) selectDevice(devices[0]);
-      if (selectedId) {
-        var cur = devices.filter(function (a) { return a.id === selectedId; })[0];
-        if (cur) selectDevice(cur);
+    Promise.all([
+      api("/admin/agents"),
+      api("/tools/winhips_clients.json").catch(function () { return { clients: [] }; })
+    ]).then(function (rs) {
+      devices = (rs[0] && rs[0].agents) || [];
+      winhipsClients = (rs[1] && rs[1].clients) || [];
+      var byId = {};
+      devices.forEach(function (a) { byId[a.id] = a; });
+      roster = [];
+      winhipsClients.forEach(function (c) {
+        if (!c.pcname || c.state !== 1) return;
+        var agent = byId[c.agent_id] || null;
+        roster.push({
+          id: c.agent_id || ("onpxe-" + c.pcname),
+          hostname: c.pcname,
+          remote_addr: c.ip || "-",
+          os: "win", arch: "",
+          online: agent ? !!agent.online : false,
+          stream_enable: agent ? !!agent.stream_enable : false,
+          streamable: !!c.streamable,
+          game_id: c.gamenames || "", game_active: !!(c.gamenames && c.gamenames.length),
+          hangame: (c.gamenames || "").indexOf("한게임") >= 0,
+          last_seen: agent ? (agent.last_seen || "") : "",
+          mac: c.mac || "", lanip: c.lanip || "",
+          agent: agent
+        });
+      });
+      var dwNow = Date.now();
+      var dwSeen = {};
+      roster.forEach(function (a) {
+        if (a.online && a.hangame && a.streamable) dwellMap[a.id] = dwNow;
+        dwSeen[a.id] = true;
+      });
+      for (var dk in dwellMap) { if (!dwSeen[dk]) delete dwellMap[dk]; }
+      var cur = selectedId ? roster.filter(function (a) { return a.id === selectedId; })[0] : null;
+      if (!cur && !userEverSelected) {
+        var watchable = roster.filter(function (a) { return a.online && a.streamable && a.hangame; });
+        if (watchable.length) selectDevice(watchable[0]);
+      } else if (cur) {
+        updateInfo(cur);
       }
+      renderAgents();
       setConn(true);
       showLogin(false);
     }).catch(function () { showLogin(true); });

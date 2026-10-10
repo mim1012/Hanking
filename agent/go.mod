@@ -1,4 +1,4 @@
-module c2agent
+module agent
 
 go 1.22
 

