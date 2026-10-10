@@ -444,7 +444,12 @@
     mseStopped = false;
     mseSeekDone = false;   // 새 스트림 — 첫 append 후 라이브 엣지로 재정렬
     var ms = new MediaSource();
-    ms.addEventListener("sourceopen", function () { startWSMSE(aId, tok); });
+    var mobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || "");
+    // 모바일은 WS MSE가 재생 아이콘에 고정되는 경우가 있어, 예전 동작하던 롱폴로 시작
+    ms.addEventListener("sourceopen", function () {
+      if (mobile) pollMSE(aId, tok);
+      else startWSMSE(aId, tok);
+    });
     ms.addEventListener("sourceended", function () {});
     video.src = URL.createObjectURL(ms);
     mseMS = ms;
