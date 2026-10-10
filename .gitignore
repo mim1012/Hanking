@@ -90,3 +90,8 @@ TODO.md
 .vscode/
 WINVM_TLS_FIX_REPORT.md
 *.zip
+# ===== 스크래치/임시 =====
+.tmp_*
+*~
+*.TXT
+agent/ViewerManager*.Zip
