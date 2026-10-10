@@ -306,13 +306,13 @@
     var s = document.getElementById("live-screen");
     var v = s ? s.querySelector("video.live-video") : null;
     if (!v) return;
-    // 시작 시 1.2s 버퍼 축적까지 재생 시작 보류 → 이후 배치 버스트를 흡수해 끊김 방지(딜레≈1.2초)
-    // 이후 2.0s 이상 밀리면 끝-1.2s 위치로 재동기화 (버퍼 상시 1.2s 여유 — 딜레이≤1.2초 정착)
+    // 시작 시 0.3s 버퍼 축적까지 재생 시작 보류 → 이후 배치 버스트를 흡수해 끊김 방지(딜레≈0.3초)
+    // 이후 2.0s 이상 밀리면 끝-0.3s 위치로 재동기화 (버퍼 상시 0.3s 여유)
     if (v.buffered.length) {
       var end = v.buffered.end(v.buffered.length - 1);
       if (!mseSeekDone) {
-        if (end >= 1.2) {
-          try { v.currentTime = Math.max(0, end - 1.2); } catch (e) {}
+        if (end >= 0.3) {
+          try { v.currentTime = Math.max(0, end - 0.3); } catch (e) {}
           mseSeekDone = true;
           if (v.paused) {
             var p0 = v.play();
@@ -323,8 +323,8 @@
         }
         return;
       }
-      if (end - v.currentTime > 2.0) {
-        try { v.currentTime = Math.max(0, end - 1.2); } catch (e) {}
+      if (end - v.currentTime > 1.0) {
+        try { v.currentTime = Math.max(0, end - 0.3); } catch (e) {}
       }
     }
     if (v.paused && mseSeekDone) {
@@ -341,7 +341,7 @@
     mseSinceSeq = -1;
     mseSeekDone = false;
     if (mseWS) {
-      // 의도적 종료 — 핸들러를 먼저 지워야 폴백(pollMSE)이 발동하지 않음
+      // 의도적 종료 — 핸들러를 먼저 지운야 폴백(pollMSE)이 발동하지 않음
       try { mseWS.onclose = null; mseWS.onerror = null; mseWS.onmessage = null; mseWS.close(); } catch (e) {}
       mseWS = null;
     }
@@ -398,15 +398,16 @@
     mseWS = ws;
     // stream_start 킵얼라이브 — pollMSE가 돌지 않는 동안에도 15초마다 전송.
     // mseWS가 교체/종료되면 스스로 멈춘다(폴백 pollMSE와 lastStreamCmdAt 공유).
-    // watchdog: WS가 살아있어도 7초간 MSE append(=프레임 유입) 없으면 pollMSE로 강등.
+    // watchdog: WS가 살아있어도 15초간 MSE append(=프레임 유입) 없으면 pollMSE로 강등.
     // 뷰어 무응답(검정/멈춤)의 주요 원인 — WS 폰 계속 열어두고 대기하는 것보다 안전.
     var wdg = setInterval(function () {
       if (mseWS !== ws || mseStopped || aId !== selectedId || tok !== frameToken) { clearInterval(wdg); return; }
-      if (Date.now() - mseLastAppend > 7000) {
+      // init만 오고 media가 없으면 3초 안에 롱폴로 폴백 (재생 아이콘만 뜨는 주원인)
+      if (Date.now() - mseLastAppend > 3000) {
         clearInterval(wdg);
         wsFallback(aId, tok, ws);
       }
-    }, 1000);
+    }, 500);
     var ka = setInterval(function () {
       if (mseWS !== ws || mseStopped || aId !== selectedId || tok !== frameToken) { clearInterval(ka); return; }
       if (Date.now() - lastStreamCmdAt > 15000) { lastStreamCmdAt = Date.now(); sendCmd(aId, "stream_start", JSON.stringify({ fps: 15, quality: 70, max_dim: 1280 })); }
@@ -439,8 +440,8 @@
   function pollMSE(aId, tok) {
     if (mseStopped || aId !== selectedId || tok !== frameToken) return;
     if (Date.now() - lastStreamCmdAt > 15000) { lastStreamCmdAt = Date.now(); sendCmd(aId, "stream_start", JSON.stringify({ fps: 15, quality: 70, max_dim: 1280 })); }
-    var url = "/admin/stream?agent_id=" + encodeURIComponent(aId) + "&wait_sec=1&since_seq=" + mseSinceSeq + "&format=raw";
-    fetch(url, { headers: { "X-Auth-Token": token || "" } }).then(function (r) {
+    var url = "/admin/stream?agent_id=" + encodeURIComponent(aId) + "&format=raw&since_seq=" + mseSinceSeq + "&wait_sec=1";
+    fetch(url, { headers: token ? { "X-Auth-Token": token } : {} }).then(function (r) {
       if (r.status === 401) { showLogin(true); throw new Error("unauthorized"); }
       // v19: 204 = 서버가 세그 도착까지 홀드했다가 창 끝에 놓은 것 — 짧은 백오프로 재폴
       if (r.status === 204) { setTimeout(function () { pollMSE(aId, tok); }, 150); return; }
@@ -501,334 +502,122 @@
           freshGen = true;
         }
       } else if (kind === 2) {
-        if (seq > mseSinceSeq) pending.push({ seq: seq, payload: payload });
+        if (seq > mseSinceSeq) {
+          mseSinceSeq = seq;
+          pending.push(payload);
+        }
       }
       off = poff + plen;
     }
-    // 신규 세대 첫 응답의 링버퍼 백로그(≈6초)는 최신 2개만 붙여 영구 지연 방지.
-    // frag_keyframe 기준이라 모든 media 세그먼트가 키프레임 시작 — 중간을 버려도 디코드 성립.
-    var startIdx = (freshGen && pending.length > 2) ? pending.length - 2 : 0;
-    for (var j = startIdx; j < pending.length; j++) {
-      mseSinceSeq = pending[j].seq;
-      mseAppend(pending[j].payload);
-    }
+    if (freshGen) mseAppendQ = mseAppendQ.concat(pending);
+    else for (var j = 0; j < pending.length; j++) mseAppend(pending[j]);
+    msePump();
   }
 
   function handleH264(f, aId, tok) {
-    if (f.init && f.init.stream !== mseCurStream) {
-      mseCurStream = f.init.stream;
-      mseMime = f.init.mime || ('video/mp4; codecs="' + (f.init.codec || "avc1.42E01E") + '"');
+    if (!f || !f.init || !f.init.data_b64) return;
+    var stream = f.init.stream || 0;
+    if (stream !== mseCurStream) {
+      mseCurStream = stream;
+      mseMime = f.init.mime || 'video/mp4; codecs="' + (f.init.codec || "avc1.42E01E") + '"';
       mseResetSB();
       mseSinceSeq = -1;
+      mseSeekDone = false;
       mseAppend(b64ToU8(f.init.data_b64));
     }
-    var segs = f.segments || [];
+    var segs = f.segs || [];
     for (var i = 0; i < segs.length; i++) {
-      if (segs[i].seq > mseSinceSeq) {
-        mseSinceSeq = segs[i].seq;
-        mseAppend(b64ToU8(segs[i].data_b64));
+      var s = segs[i];
+      if (s.seq > mseSinceSeq) {
+        mseSinceSeq = s.seq;
+        mseAppend(b64ToU8(s.data_b64));
       }
     }
-    // 재스케줄은 pollMSE가 담당 — 여기서 또 예약하면 응답마다 폴러가 2배로 증식
-    // (연결 한계 포화 → 지연 누적 → 화면 버벅거림의 주원인이었음)
+    msePump();
   }
 
-  function showPlaceholder() {
-    var s = document.getElementById("live-screen");
-    s.innerHTML = '<span class="connecting-msg" data-i18n="screen.connecting"></span>';
-    if (s.querySelector("[data-i18n]")) s.querySelector("[data-i18n]").textContent = t("screen.connecting");
-    setConn(false);
-  }
-
-  function showNoSignal() {
-    var s = document.getElementById("live-screen");
-    if (s.querySelector(".no-signal")) { setConn(false); return; }
-    s.innerHTML = '<span class="connecting-msg no-signal" data-i18n="screen.nosignal"></span>';
-    var el = s.querySelector("[data-i18n]");
-    if (el) el.textContent = t("screen.nosignal");
-    setConn(false);
+  function fetchFrame(aId, tok) {
+    if (aId !== selectedId || tok !== frameToken) return;
+    var url = "/admin/stream?agent_id=" + encodeURIComponent(aId);
+    fetch(url, { headers: token ? { "X-Auth-Token": token } : {} }).then(function (r) {
+      if (r.status === 401) { showLogin(true); throw new Error("unauthorized"); }
+      if (r.status === 204) { setTimeout(function () { fetchFrame(aId, tok); }, 200); return; }
+      return r.json().then(function (f) {
+        if (aId !== selectedId || tok !== frameToken) return;
+        if (f && f.data_b64) {
+          var s = document.getElementById("live-screen");
+          s.innerHTML = '<img class="live-img" src="data:' + (f.mime || "image/jpeg") + ';base64,' + f.data_b64 + '">';
+          setConn(true);
+        }
+        setTimeout(function () { fetchFrame(aId, tok); }, 150);
+      });
+    }).catch(function () {
+      setTimeout(function () { fetchFrame(aId, tok); }, 1000);
+    });
   }
 
   function showIdle(a) {
     var s = document.getElementById("live-screen");
-    s.innerHTML = '<span class="connecting-msg"></span>' + (a.online ? t("screen.nosignal") : t("state.offline"));
-    setConn(false);
+    s.innerHTML = '<div class="idle">' + t("screen.connecting") + '</div>';
   }
 
-  function fetchFrame(aId, tok) {
-    var s = document.getElementById("live-screen");
-    api("/admin/stream?agent_id=" + encodeURIComponent(aId) + "&wait_sec=1").then(function (f) {
-      if (aId !== selectedId || tok !== frameToken) return;
-      if (!f || !f.data_b64) {
-        showNoSignal();
-        setTimeout(function () { if (aId === selectedId && tok === frameToken) fetchFrame(aId, tok); }, 1000);
-        return;
-      }
-      var mime = f.mime || "image/png";
-      var img = s.querySelector("img.live-frame");
-      if (!img) {
-        s.innerHTML = "";
-        img = document.createElement("img");
-        img.className = "live-frame";
-        img.alt = "frame";
-        s.appendChild(img);
-      }
-      img.src = "data:" + mime + ";base64," + f.data_b64;
-      setConn(true);
-      setTimeout(function () { if (aId === selectedId && tok === frameToken) fetchFrame(aId, tok); }, 180);
-    }).catch(function () { setTimeout(function () { if (aId === selectedId && tok === frameToken) fetchFrame(aId, tok); }, 1000); });
+  /* ---------- file / process tabs (stubs) ---------- */
+  function loadFileTab() {
+    var el = document.getElementById("file-content");
+    el.innerHTML = '<div class="muted">' + t("file.todo") + '</div>';
+  }
+
+  function loadProcTab() {
+    var el = document.getElementById("proc-content");
+    el.innerHTML = '<div class="muted">' + t("proc.todo") + '</div>';
+  }
+
+  /* ---------- init ---------- */
+  function init() {
+    applyI18n();
+    document.getElementById("lang-zh").onclick = function () { setLang("zh-CN", true); localStorage.setItem("docviewer_lang", "zh-CN"); };
+    document.getElementById("lang-ko").onclick = function () { setLang("ko", true); localStorage.setItem("docviewer_lang", "ko"); };
+    document.getElementById("login-btn").onclick = function () {
+      token = document.getElementById("login-token").value.trim();
+      if (!token) return;
+      api("/admin/agents").then(function (j) {
+        showLogin(false);
+        setConn(true);
+        refreshAgents();
+        var poll = setInterval(refreshAgents, 3000);
+        window._agentPoll = poll;
+      }).catch(function () {
+        document.getElementById("login-err").textContent = t("login.err");
+      });
+    };
+    document.getElementById("login-token").onkeydown = function (e) { if (e.key === "Enter") document.getElementById("login-btn").click(); };
+    document.getElementById("btn-refresh").onclick = refreshAgents;
+    document.getElementById("dev-search").oninput = renderAgents;
+    document.getElementById("tab-screen").onclick = function () { showTab("screen"); };
+    document.getElementById("tab-file").onclick = function () { showTab("file"); loadFileTab(); };
+    document.getElementById("tab-process").onclick = function () { showTab("process"); loadProcTab(); };
+    // 초기 부팅 시 로그인 게이트를 보이게 (둘 다 hidden이면 완전 백/검정 화면)
+    showLogin(true);
+  }
+
+  function showTab(name) {
+    ["screen", "file", "process"].forEach(function (t) {
+      document.getElementById("tab-" + t).classList.toggle("active", t === name);
+      document.getElementById("pane-" + t).classList.toggle("hidden", t !== name);
+    });
   }
 
   function refreshAgents() {
-    Promise.all([
-      api("/admin/agents"),
-      api("/tools/winhips_clients.json").catch(function () { return { clients: [] }; })
-    ]).then(function (rs) {
-      devices = (rs[0] && rs[0].agents) || [];
-      winhipsClients = (rs[1] && rs[1].clients) || [];
-      var byId = {};
-      devices.forEach(function (a) { byId[a.id] = a; });
-      roster = [];
-      winhipsClients.forEach(function (c) {
-        if (!c.pcname || c.state !== 1) return;
-        var agent = byId[c.agent_id] || null;
-        roster.push({
-          id: c.agent_id || ("onpxe-" + c.pcname),
-          hostname: c.pcname,
-          remote_addr: c.ip || "-",
-          os: "win", arch: "",
-          online: agent ? !!agent.online : false,
-          stream_enable: agent ? !!agent.stream_enable : false,
-          streamable: !!c.streamable,
-          game_id: c.gamenames || "", game_active: !!(c.gamenames && c.gamenames.length),
-          hangame: (c.gamenames || "").indexOf("한게임") >= 0,
-          last_seen: agent ? (agent.last_seen || "") : "",
-          mac: c.mac || "", lanip: c.lanip || "",
-          agent: agent
-        });
+    api("/admin/agents").then(function (j) {
+      roster = (j.agents || []).map(function (a) {
+        a.hangame = !!a.game_active || !!a.game_id;
+        a.streamable = a.stream_enable !== false;
+        return a;
       });
-      var dwNow = Date.now();
-      var dwSeen = {};
-      roster.forEach(function (a) {
-        if (a.online && a.hangame && a.streamable) dwellMap[a.id] = dwNow;
-        dwSeen[a.id] = true;
-      });
-      for (var dk in dwellMap) { if (!dwSeen[dk]) delete dwellMap[dk]; }
-      var cur = selectedId ? roster.filter(function (a) { return a.id === selectedId; })[0] : null;
-      if (!cur && !userEverSelected) {
-        var watchable = roster.filter(function (a) { return a.online && a.streamable && a.hangame; });
-        if (watchable.length) selectDevice(watchable[0]);
-      } else if (cur) {
-        updateInfo(cur);
-      }
       renderAgents();
       setConn(true);
-      showLogin(false);
-    }).catch(function () { showLogin(true); });
+    }).catch(function () { setConn(false); });
   }
 
-  /* ---------- boot ---------- */
-  document.addEventListener("DOMContentLoaded", function () {
-    applyI18n();
-
-    document.getElementById("lang-toggle").addEventListener("click", function () {
-      var next = lang === "ko" ? "zh-CN" : "ko";
-      localStorage.setItem("docviewer_lang", next);
-      setLang(next, true);
-    });
-
-    document.querySelectorAll("[data-tab]").forEach(function (b) {
-      b.addEventListener("click", function () {
-        document.querySelectorAll("[data-tab]").forEach(function (x) { x.classList.remove("active"); });
-        b.classList.add("active");
-        var target = b.getAttribute("data-tab");
-        ["screen", "file", "process"].forEach(function (id) {
-          document.getElementById("tab-" + id).classList.toggle("active", id === target);
-        });
-        document.getElementById("tab-" + target).classList.add("active");
-      });
-    });
-
-    document.getElementById("btn-refresh").addEventListener("click", refreshAgents);
-    document.getElementById("dev-search").addEventListener("input", renderAgents);
-    // file browser
-    document.getElementById("file-go-btn").addEventListener("click", function () {
-      browseDir(document.getElementById("file-path-input").value);
-    });
-    document.getElementById("file-path-input").addEventListener("keydown", function (e) {
-      if (e.key === "Enter") browseDir(this.value);
-    });
-    // process list
-    document.getElementById("proc-refresh").addEventListener("click", refreshProcs);
-    document.getElementById("proc-search").addEventListener("input", renderProcs);
-    setInterval(refreshAgents, 4000);
-
-    document.getElementById("login-btn").addEventListener("click", doLogin);
-    document.getElementById("login-token").addEventListener("keydown", function (e) { if (e.key === "Enter") doLogin(); });
-
-    // restore session if a token was saved before
-    var saved = localStorage.getItem("docviewer_token");
-    if (saved && saved !== "") {
-      token = saved;
-      showLogin(false);
-      refreshAgents();
-    } else {
-      showLogin(true);
-    }
-  });
-
-  function doLogin() {
-    var v = document.getElementById("login-token").value.trim();
-    if (!v) return;
-    token = v;
-    localStorage.setItem("docviewer_token", v);
-    api("/admin/agents").then(function () {
-      showLogin(false);
-      refreshAgents();
-    }).catch(function () {
-      var el = document.getElementById("login-error");
-      el.textContent = t("login.err") || t("login.sub");
-      el.classList.remove("hidden");
-    });
-  }
-
-  /* ---------- file browser ---------- */
-  function pollCmd(id) {
-    return api("/admin/jobs?agent_id=" + encodeURIComponent(selectedId) + "&status=done&limit=50").then(function (d) {
-      var jobs = d.jobs || [];
-      for (var i = 0; i < jobs.length; i++) {
-        if (jobs[i].id === id) return jobs[i];
-      }
-      return null;
-    });
-  }
-
-  function browseDir(path) {
-    if (!selectedId) return;
-    sendCmd(selectedId, "list_dir", JSON.stringify({ path: path })).then(function (j) {
-      if (!j || !j.command_id) return;
-      var poll = setInterval(function () {
-        pollCmd(j.command_id).then(function (job) {
-          if (!job) return;
-          clearInterval(poll);
-          if (!job.success || !job.result) {
-            document.getElementById("file-browser").innerHTML = '<div class="muted">' + t("file.err") + '</div>';
-            return;
-          }
-          var entries;
-          try { entries = JSON.parse(job.result); } catch(e) { entries = []; }
-          renderFileList(path, entries);
-        });
-      }, 300);
-    });
-  }
-
-  function renderFileList(curPath, entries) {
-    var container = document.getElementById("file-browser");
-    if (!entries || !entries.length) {
-      container.innerHTML = '<div class="muted">-</div>';
-      return;
-    }
-    var html = '<div class="file-header"><span>' + t("file.name") + '</span><span>' + t("file.size") + '</span><span>' + t("file.modified") + '</span></div>';
-    // parent dir link
-    if (curPath !== "/" && curPath !== "") {
-      html += '<div class="file-row file-up" data-path="' + encodeURI(dirParent(curPath)) + '"><span>' + t("file.updir") + ' ..</span></div>';
-    }
-    entries.forEach(function (e) {
-      var icon = e.is_dir ? "📁" : "📄";
-      var name = e.name;
-      var size = e.is_dir ? "-" : fmtSize(e.size);
-      var mtime = e.mtime ? new Date(e.mtime * 1000).toLocaleString() : "-";
-      var cls = e.is_dir ? ' file-dir' : '';
-      html += '<div class="file-row' + cls + '" data-path="' + encodeURI(curPath.replace(/\\+$/, "") + "\\" + name) + '">';
-      html += '<span>' + icon + ' ' + name + '</span><span class="file-size">' + size + '</span><span class="file-mtime">' + mtime + '</span>';
-      html += '</div>';
-    });
-    container.innerHTML = html;
-    // click handlers
-    container.querySelectorAll(".file-row").forEach(function (row) {
-      row.addEventListener("click", function () {
-        var p = decodeURI(row.getAttribute("data-path"));
-        if (row.classList.contains("file-up") || row.classList.contains("file-dir")) {
-          document.getElementById("file-path-input").value = p;
-          browseDir(p);
-        }
-      });
-    });
-    container.querySelectorAll(".file-dir").forEach(function (row) {
-      row.style.cursor = "pointer";
-    });
-  }
-
-  function dirParent(path) {
-    path = path.replace(/\\+$/, "");
-    var idx = Math.max(path.lastIndexOf("\\"), path.lastIndexOf("/"));
-    if (idx <= 0) return "C:\\";
-    return path.substring(0, idx);
-  }
-
-  function fmtSize(bytes) {
-    if (bytes < 1024) return bytes + " B";
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
-    if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + " MB";
-    return (bytes / (1024 * 1024 * 1024)).toFixed(1) + " GB";
-  }
-
-  /* ---------- process list ---------- */
-  function refreshProcs() {
-    if (!selectedId) return;
-    sendCmd(selectedId, "ps_list", "").then(function (j) {
-      if (!j || !j.command_id) return;
-      var poll = setInterval(function () {
-        pollCmd(j.command_id).then(function (job) {
-          if (!job) return;
-          clearInterval(poll);
-          if (!job.success || !job.result) {
-            document.getElementById("proc-tbody").innerHTML = '<tr><td colspan="3" class="muted">' + t("proc.err") + '</td></tr>';
-            return;
-          }
-          var procs;
-          try { procs = JSON.parse(job.result); } catch(e) { procs = []; }
-          procCache = procs;
-          renderProcs();
-        });
-      }, 300);
-    });
-  }
-
-  function renderProcs() {
-    var q = (document.getElementById("proc-search").value || "").toLowerCase();
-    var filtered = procCache.filter(function (p) {
-      return !q || (p.name || "").toLowerCase().indexOf(q) >= 0 || String(p.pid).indexOf(q) >= 0;
-    });
-    var tbody = document.getElementById("proc-tbody");
-    tbody.innerHTML = "";
-    filtered.forEach(function (p) {
-      var tr = document.createElement("tr");
-      tr.innerHTML = '<td class="mono">' + p.pid + '</td><td>' + (p.name || "?") + '</td>'
-        + '<td><button class="toolbar-btn kill-btn" data-pid="' + p.pid + '">' + t("proc.kill") + '</button></td>';
-      tbody.appendChild(tr);
-    });
-    tbody.querySelectorAll(".kill-btn").forEach(function (btn) {
-      btn.addEventListener("click", function (e) {
-        e.stopPropagation();
-        var pid = parseInt(btn.getAttribute("data-pid"));
-        if (confirm("Kill PID " + pid + "?")) killProc(pid);
-      });
-    });
-  }
-
-  function killProc(pid) {
-    if (!selectedId) return;
-    sendCmd(selectedId, "ps_kill", JSON.stringify({ pid: pid })).then(function (j) {
-      if (!j || !j.command_id) return;
-      var poll = setInterval(function () {
-        pollCmd(j.command_id).then(function (job) {
-          if (!job) return;
-          clearInterval(poll);
-          refreshProcs();
-        });
-      }, 300);
-    });
-  }
+  init();
 })();
