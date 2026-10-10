@@ -256,10 +256,10 @@
 
   function stopStream() {
     if (!currentStreamId) return;
-    var id = currentStreamId;
     currentStreamId = null;
     stopMSE();
-    sendCmd(id, "stream_stop", "");
+    // stream_stop를 보내지 않음. c2push는 stream_start 후 90초 TTL로 스스로 종료한다.
+    // 전환마다 stop을 내면 직전 좌석 인코더가 죽고, 다시 누르면 콜드스타트(검정/재생아이콘)가 된다.
   }
 
   /* ---------- H264 fMP4 via MediaSource (MSE) ---------- */
@@ -360,7 +360,8 @@
       var start = v.buffered.start(0);
       // 첫 재생은 버퍼 시작부터. 라이브 끝으로 점프하면 키프레임 없어 검정이 됨.
       if (!mseSeekDone && end > start) {
-        try { if (v.currentTime < start) v.currentTime = start; } catch (e) {}
+        // 링에 이미 있는 최신 구간으로 점프 — 전환 즉시 현재 화면 (처음부터 재생하지 않음)
+        try { v.currentTime = Math.max(start, end - 0.4); } catch (e) {}
         mseSeekDone = true;
       }
       // 2.5초 이상 밀릴 때만 따라잡기
