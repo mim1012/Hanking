@@ -53,7 +53,11 @@ func newViewerPC() (*webrtc.PeerConnection, error) {
 	if err := se.SetEphemeralUDPPortRange(50000, 50100); err != nil {
 		return nil, err
 	}
-	api := webrtc.NewAPI(webrtc.WithSettingEngine(se))
+	me := &webrtc.MediaEngine{}
+	if err := me.RegisterDefaultCodecs(); err != nil {
+		return nil, err
+	}
+	api := webrtc.NewAPI(webrtc.WithMediaEngine(me), webrtc.WithSettingEngine(se))
 	return api.NewPeerConnection(webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{{
 			URLs: []string{"stun:stun.l.google.com:19302"},
