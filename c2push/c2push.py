@@ -42,7 +42,7 @@ SCALE=(960,540)
 SEATS_FILE="/root/c2/seats.json"
 
 FFMPEG = shutil.which("ffmpeg") or "ffmpeg"
-H264_FPS = 15           # 타깃 프레임레이트 — v4.1: 30은 956MB 박스 스왑스래시 유발, 15로 절감
+H264_FPS = 24           # 타깃 프레임레이트 — 15는 끊김, 30은 스왑. 24로 중간
 FULL_TIMEOUT = 60.0     # full/본문 수신 타임아웃(초)
 POLL_IDLE = 0.7         # 폴링 모드 증분 요청 무응답 판정(초) — v2 3.0에서 단축
 CONT_TIMEOUT = 2.0      # continuous 모드 서버 푸시 대기(초) — 정적 화면이면 이 간격으로 idle
