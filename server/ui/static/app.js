@@ -360,13 +360,13 @@
       var start = v.buffered.start(0);
       // 첫 재생은 버퍼 시작부터. 라이브 끝으로 점프하면 키프레임 없어 검정이 됨.
       if (!mseSeekDone && end > start) {
-        // 링에 이미 있는 최신 구간으로 점프 — 전환 즉시 현재 화면 (처음부터 재생하지 않음)
-        try { v.currentTime = Math.max(start, end - 0.4); } catch (e) {}
+        // 끝에서 1.2초 뒤에서 시작 — 세그 간격(약 130ms)이 보여 끊기지 않게 여유
+        try { v.currentTime = Math.max(start, end - 1.2); } catch (e) {}
         mseSeekDone = true;
       }
-      // 2.5초 이상 밀릴 때만 따라잡기
-      if (mseSeekDone && end - v.currentTime > 2.5) {
-        try { v.currentTime = Math.max(start, end - 0.8); } catch (e) {}
+      // 4초 이상 밀릴 때만 따라잡기. 자주 점프하면 끊김으로 보임
+      if (mseSeekDone && end - v.currentTime > 4) {
+        try { v.currentTime = Math.max(start, end - 1.2); } catch (e) {}
       }
     }
     if (v.paused) {
