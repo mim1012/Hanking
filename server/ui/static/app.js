@@ -336,8 +336,8 @@
     if (v.buffered.length) {
       var end = v.buffered.end(v.buffered.length - 1);
       if (!mseSeekDone) {
-        if (end >= 0.1) {
-          try { v.currentTime = Math.max(0, end - 0.1); } catch (e) {}
+        if (end >= 0.8) {
+          try { v.currentTime = Math.max(0, end - 0.5); } catch (e) {}
           mseSeekDone = true;
         }
         // 모바일: 버퍼 대기 중 pause 하면 네이티브 재생 아이콘에 고정됨. pause 하지 않음.
@@ -345,8 +345,8 @@
         if (p0 && p0.catch) p0.catch(function () {});
         return;
       }
-      if (end - v.currentTime > 1.0) {
-        try { v.currentTime = Math.max(0, end - 0.1); } catch (e) {}
+      if (end - v.currentTime > 1.5) {
+        try { v.currentTime = Math.max(0, end - 0.5); } catch (e) {}
       }
     }
     if (v.paused && mseSeekDone) {
@@ -354,44 +354,6 @@
       if (p && p.catch) p.catch(function () {});
     }
   }
-
-  function ensureLagHud() {
-    var s = document.getElementById("live-screen");
-    if (!s) return null;
-    var el = document.getElementById("lag-hud");
-    if (!el) {
-      el = document.createElement("div");
-      el.id = "lag-hud";
-      el.style.cssText = "position:absolute;top:8px;right:8px;z-index:5;background:rgba(0,0,0,.65);color:#9f9;font:12px/1.3 ui-monospace,monospace;padding:4px 8px;border-radius:4px;pointer-events:none";
-      s.appendChild(el);
-    }
-    return el;
-  }
-
-  function sampleLag() {
-    var v = document.querySelector("video.live-video");
-    var hud = ensureLagHud();
-    if (!v || !v.buffered || !v.buffered.length) {
-      window.__streamLag = { ok: false, reason: "no-buffer" };
-      if (hud) hud.textContent = "lag: no buffer";
-      return;
-    }
-    var end = v.buffered.end(v.buffered.length - 1);
-    var lag = end - v.currentTime;
-    var info = {
-      ok: true,
-      lag_s: Math.round(lag * 100) / 100,
-      paused: v.paused,
-      ready: v.readyState,
-      end: Math.round(end * 100) / 100,
-      t: Math.round(v.currentTime * 100) / 100
-    };
-    window.__streamLag = info;
-    if (hud) hud.textContent = "lag " + info.lag_s.toFixed(2) + "s" + (info.paused ? " paused" : "");
-    if (window.__streamLagLog) console.log("[stream-lag]", info);
-  }
-
-  if (!window._lagTimer) window._lagTimer = setInterval(sampleLag, 1000);
 
   function stopMSE() {
 
