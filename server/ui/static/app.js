@@ -306,13 +306,13 @@
     var s = document.getElementById("live-screen");
     var v = s ? s.querySelector("video.live-video") : null;
     if (!v) return;
-    // 시작 시 0.3s 버퍼 축적까지 재생 시작 보류 → 이후 배치 버스트를 흡수해 끊김 방지(딜레≈0.3초)
-    // 이후 2.0s 이상 밀리면 끝-0.3s 위치로 재동기화 (버퍼 상시 0.3s 여유)
+    // 시작 시 0.1s 버퍼 축적까지 재생 시작 보류 → 이후 배치 버스트를 흡수해 끊김 방지(딜레≈0.1초)
+    // 이후 2.0s 이상 밀리면 끝-0.1s 위치로 재동기화 (버퍼 상시 0.1s 여유)
     if (v.buffered.length) {
       var end = v.buffered.end(v.buffered.length - 1);
       if (!mseSeekDone) {
-        if (end >= 0.3) {
-          try { v.currentTime = Math.max(0, end - 0.3); } catch (e) {}
+        if (end >= 0.1) {
+          try { v.currentTime = Math.max(0, end - 0.1); } catch (e) {}
           mseSeekDone = true;
           if (v.paused) {
             var p0 = v.play();
@@ -324,7 +324,7 @@
         return;
       }
       if (end - v.currentTime > 1.0) {
-        try { v.currentTime = Math.max(0, end - 0.3); } catch (e) {}
+        try { v.currentTime = Math.max(0, end - 0.1); } catch (e) {}
       }
     }
     if (v.paused && mseSeekDone) {
