@@ -873,13 +873,21 @@ func handleAgentWS(w http.ResponseWriter, r *http.Request) {
 	})
 	pingDone := make(chan struct{})
 	defer close(pingDone)
+	var writeMu sync.Mutex
+	writeLocked := func(fn func() error) error {
+		writeMu.Lock()
+		defer writeMu.Unlock()
+		return fn()
+	}
 	go func() {
 		t := time.NewTicker(pingPeriod)
 		defer t.Stop()
 		for {
 			select {
 			case <-t.C:
-				_ = conn.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(writeWait))
+				_ = writeLocked(func() error {
+					return conn.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(writeWait))
+				})
 			case <-pingDone:
 				return
 			}
@@ -1763,9 +1771,12 @@ func handleAdminWSStream(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	writeRecord := func(kind byte, stream, seq int64, codec string, payload []byte) bool {
-		_ = conn.SetWriteDeadline(time.Now().Add(writeWait))
 		buf := streamRawRecord(make([]byte, 0, 22+len(codec)+len(payload)), kind, stream, seq, codec, payload)
-		return conn.WriteMessage(websocket.BinaryMessage, buf) == nil
+		err := writeLocked(func() error {
+			_ = conn.SetWriteDeadline(time.Now().Add(writeWait))
+			return conn.WriteMessage(websocket.BinaryMessage, buf)
+		})
+		return err == nil
 	}
 
 	var (
