@@ -1745,13 +1745,21 @@ func handleAdminWSStream(w http.ResponseWriter, r *http.Request) {
 	})
 	pingDone := make(chan struct{})
 	defer close(pingDone)
+	var writeMu sync.Mutex
+	writeLocked := func(fn func() error) error {
+		writeMu.Lock()
+		defer writeMu.Unlock()
+		return fn()
+	}
 	go func() {
 		t := time.NewTicker(pingPeriod)
 		defer t.Stop()
 		for {
 			select {
 			case <-t.C:
-				_ = conn.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(writeWait))
+				_ = writeLocked(func() error {
+					return conn.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(writeWait))
+				})
 			case <-pingDone:
 				return
 			}
