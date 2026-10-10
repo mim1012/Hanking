@@ -31,6 +31,14 @@
 - 마이그레이션(sellermate-contracts, 커밋 0cff5f7): **051** pool identity fail-closed 트리거(active pool은 자기 assignment+mid가 현재 슬롯과 일치해야; 슬롯 변경 시 자동 archive) / **052** 현재-identity positive 1회 대량 승격(21,676행) / **053** `pg_cron promote-positives-1min` 매분 gap-fill 승격(재발방지). candidates 핫테이블 per-row 트리거는 DB CPU 포화(migration 050) 재현 위험이라 배치 cron 선택.
 - ⚠️ **sentinel 위험 상속**: verifier positive(Patchright 브라우저 캐러셀)는 2026-08-21 엑셀 무증거보다 안전하나 noCDP 클릭 surface와 완전 동일은 아님 → MID_NOT_FOUND 잔존 가능. 굶는 슬롯 중 12개는 candidate 전부 negative(MID 캐러셀 실부재)로 구제 불가(상품/키워드 교체 필요).
 
+## 2026-09-26 함정: 053 크론이 러너 강등을 1분 안에 되살림
+
+- 증상: "검증풀 키워드인데 같은 슬롯이 하루 700타씩 0% MID_NOT_FOUND". 풀은 active/confirmed, verified_at=방금.
+- 원인: `promote_current_identity_positives`는 "active 행이 없으면" 과거 positive를 upsert하며 state='active'·verified_at=now()로 덮는다 → `report_strategy_slot`의 MNF 쿼럼 cooldown이 다음 분에 무효화(slot 7350: 13:35:53 cooldown → 13:36:00 active). claim_v3는 state만 보므로 즉시 재배정. v2 quorum reject는 `probation` 전용이라 053의 `confirmed` 행엔 불발.
+- 고침: adpang PR#91 `supabase-migrations/fix-promote-positives-no-resurrect.sql` — 쿨다운 중 행은 이후 새 positive가 있을 때만 재승격 + 부활행 1회 복구.
+- 주의: 풀 `verified_at`은 신선도가 아니다(진짜 검증시각=`keyword_pipeline_candidates.updated_at`). pc-쇼핑 surface 검증기는 없고 pc_tonggeom 검증은 9/17 이후 0건이라, 신선도·surface 일치 게이트를 걸면 pc 슬롯이 전멸한다.
+- 운영 DB 무흔적 드라이런: DO 블록에서 DDL·UPDATE 실행 후 `RAISE EXCEPTION`에 수치를 담아 강제 롤백 — `D:\Project\turafic_update\scripts\_promote-guard-dryrun.mjs`.
+
 ## 구현 앵커
 
 - `D:\Project\zero-landing\tools\keyword-pipeline.mjs` — HTTP SERP 수집·검증 및 query dedup (정식 pool 승격 경로 verifyQueryTasks:590)

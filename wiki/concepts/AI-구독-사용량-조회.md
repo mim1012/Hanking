@@ -7,6 +7,7 @@
 
 ## 정본 구현 (canonical)
 - **Claude OAuth usage 조회** — `usage-widget/widget.py:107` — `~/.claude/.credentials.json`의 accessToken으로 `GET api.anthropic.com/api/oauth/usage` (`anthropic-beta: oauth-2025-04-20`). 응답: `five_hour/seven_day{utilization,resets_at}`.
+- **Claude 멀티프로필 조회** — `usage-widget/widget.py` `_claude_profiles`/`fetch_claude` — `config.json`의 `claude_profiles[{name,config_dir}]`를 각각 `config_dir/.credentials.json`으로 해석해 프로필 카드를 보존한다. CLI 실행 때도 같은 `CLAUDE_CONFIG_DIR`를 써야 로그인 상태와 조회 대상이 일치한다.
 - **Claude 토큰 refresh + 파일 회수** — `usage-widget/widget.py:88` — `POST console.anthropic.com/v1/oauth/token` (client_id `9d1c250a-...`), 새 access/refresh 토큰을 `.credentials.json`에 다시 기록해 Claude Code와 공유.
 - **Codex rate limit 조회** — `usage-widget/widget.py:212` — `~/.codex/auth.json` 토큰으로 `GET chatgpt.com/backend-api/wham/usage`, `used_percent` 필드 재귀 탐색 파싱(`:160`). refresh는 `auth.openai.com/oauth/token` client_id `app_EMoamEEZ73f0CkXaXp7hrann`(`:189`). 오프라인 폴백: 세션 jsonl의 `rate_limits` 스냅샷(`:269`).
 - **OpenRouter 크레딧 잔액** — `usage-widget/widget.py:377` — `GET openrouter.ai/api/v1/credits` (Bearer 키). 응답 `data{total_credits,total_usage}` → 남음 = total_credits - total_usage.
@@ -14,6 +15,7 @@
 - **DeepSeek/Kimi 잔액** — `usage-widget/widget.py:296` / `:323` — `GET api.deepseek.com/user/balance`, `GET api.moonshot.ai(.cn)/v1/users/me/balance` (Bearer 키).
 - **GLM 코딩플랜 쿼터** — `usage-widget/widget.py:351` — `GET api.z.ai/api/monitor/usage/quota/limit`, Authorization에 **Bearer 접두사 없이** 키만.
 - **Codex 멀티계정 병렬 조회** — `usage-widget/widget.py` `fetch_codex`/`_codex_profiles` — 계정마다 완전히 분리된 `CODEX_HOME`(`D:\.codex-1`, `D:\.codex-2`)의 auth.json을 `config.json`의 `codex_profiles`에 등록해 각각 독립 refresh·조회, `Codex (라벨)`로 구분 표시. 전환은 `codex1.cmd`/`codex2.cmd`(`%USERPROFILE%\.local\bin`, PATH 등록)로 `CODEX_HOME`만 바꿔 codex CLI 실행 — Paseo 등 codex CLI를 그대로 실행하는 IDE에서도 이 커맨드를 쓰면 계정이 갈린다.
+- **로컬 브라우저 대시보드 + 비밀정보 경계** — `usage-widget/server.py` + `usage-widget/public/` — `127.0.0.1` 전용 정적 서버가 Claude/Codex 결과를 `sanitize_results_for_dashboard()`로 축소해 토큰·API 키·인증 경로 없이 반환한다. 서버 스냅샷 캐시가 자동 갱신·재로딩 요청을 합쳐 429를 줄인다.
 
 ## 주의점 / 함정
 - **"refresh 토큰 회수 기록"**: 갱신 후 새 refresh_token을 원본 인증 파일에 되써주지 않으면 CLI 쪽 로그인이 깨진다 (rotating refresh token).

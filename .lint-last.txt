@@ -1,20 +1,24 @@
-﻿# lint ?먮룞 ?ㅽ뻾 (二쇨컙 ?ㅼ?以? ??2026-09-14 10:00
+﻿# lint ?먮룞 ?ㅽ뻾 (二쇨컙 ?ㅼ?以? ??2026-10-05 10:00
 
-pages: 131 (concepts 73, projects 44)
+pages: 149 (concepts 91, projects 44)
 
-DEAD LINKS: 2
+DEAD LINKS: 3
+  log.md -> [[vortex-accept-observability]]
   wiki\concepts\Flutter-DartAOT-Blutter?뺤쟻蹂듭썝.md -> [[kali-migration]]
   wiki\concepts\Flutter-DartAOT-Blutter?뺤쟻蹂듭썝.md -> [[kali-migration]]
 
 ORPHANS (no inbound links): 0
 
-FILE:LINE refs checked: 296, stale: 35
+FILE:LINE refs checked: 338, stale: 39
   log.md -> turafic_update/shared/postgrest-paging.ts:21 (file missing)
   log.md -> android/cdp.ts:244 (file missing)
+  wiki\concepts\DOM?ㅼ틪-?먯떆?듭빱??議곌린醫낅즺-源딆??쒖쐞-NOT_FOUND.md -> rank-check/android-app/app/src/main/java/com/navertraffic/rankchecker/ChromeCdpRanker.kt:600 (file missing)
   wiki\concepts\plpgsql-?좎씫湲?理쒖쟻??md -> dev-cache/Temp/zen-nocdp-sm01/supabase-migrations/022-optimize-claim-strategy-slot.sql:71 (file missing)
   wiki\concepts\plpgsql-?좎씫湲?理쒖쟻??md -> dev-cache/Temp/zen-nocdp-sm01/supabase-migrations/022-optimize-claim-strategy-slot.sql:83 (file missing)
   wiki\concepts\plpgsql-?좎씫湲?理쒖쟻??md -> dev-cache/Temp/zen-nocdp-sm01/supabase-migrations/022-optimize-claim-strategy-slot.sql:125 (file missing)
   wiki\concepts\PostgREST-1000?됱벙-?뚰뵾.md -> turafic_update/shared/postgrest-paging.ts:21 (file missing)
+  wiki\concepts\PostgREST-RPC-?듭뀡?뚮씪誘명꽣異붽?-PGRST203-?ㅻ쾭濡쒕뱶-臾댁쨷??md -> scripts/apply-supabase-migrations.mjs:12 (file missing)
+  wiki\concepts\sec-ch-ua-grease-遺덉씪移??ㅼ씠踰꾩눥?묎???濡쒓렇?멸쾶?댄듃.md -> naver_turafic_samsung/.../strategy/BrowserPersona.kt:63 (file missing)
   wiki\concepts\Supabase-留덉씠洹몃젅?댁뀡-肄붾뱶諛고룷-遺꾨━.md -> badar/docs/engineering-discipline/plans/2026-09-11-settlement-pr-handoff.md:43 (file missing)
   wiki\concepts\UA-ClientHints-?뺥빀-CDP紐⑤컮?쇱쐞??md -> turafic_update(rebuild-0814-cdp)/shared/mobile-stealth.ts:183 (file missing)
   wiki\concepts\UA-ClientHints-?뺥빀-CDP紐⑤컮?쇱쐞??md -> turafic_update(rebuild-0814-cdp)/scripts/strategy-a-runner.ts:728 (file missing)
@@ -26,9 +30,10 @@ FILE:LINE refs checked: 296, stale: 35
   wiki\concepts\釉뚮씪?곗?-?몄뀡荑좏궎-?곸냽??md -> sinsang/src/services/browser_manager.py:124 (file missing)
   wiki\concepts\?ㅽ뿕-洹몃옒???ㅼ??ㅽ듃?덉씠??md -> dev-cache/Temp/social-canary/scripts/exp-fire-now.mjs:11 (file missing)
   wiki\concepts\?ㅽ뿕-洹몃옒???ㅼ??ㅽ듃?덉씠??md -> dev-cache/Temp/social-canary/scripts/rank-delta.mjs:25 (file missing)
+  wiki\concepts\?덈뱶濡쒖씠???곹뭹??釉붾줈洹몄삤??href醫뚰몴?ㅼ틪-vs-title寃??md -> naver_turafic_samsung/.../strategy/SamsungWebViewManager.kt:1004 (file missing)
+  wiki\concepts\?덈뱶濡쒖씠???곹뭹??釉붾줈洹몄삤??href醫뚰몴?ㅼ틪-vs-title寃??md -> naver_turafic_samsung/.../strategy/SamsungBrowserStrategyD.kt:144 (file missing)
   wiki\concepts\?뚰겕?몃━-寃⑸━-PR-staging-寃利?md -> badar/src/server/settlements/importWorkbook.ts:210 (file missing)
   wiki\concepts\罹≪감-李⑤떒-???md -> somae-collector/src/services/browser_manager.py:145 (file missing)
-  wiki\projects\project-adpang-production.md -> supabase-migrations/fix-sellermate-naver-rank-history-ssot.sql:6 (file missing)
   wiki\projects\project-delivery-platform.md -> docs/engineering-discipline/plans/2026-09-11-settlement-pr-handoff.md:91 (file missing)
   wiki\projects\project-kmong.md -> scripts/kmong_probe_with_profile.py:23 (file missing)
   wiki\projects\project-kmong.md -> scripts/kmong_finalize_proof_service_cdp.py:108 (file missing)
@@ -45,20 +50,22 @@ FILE:LINE refs checked: 296, stale: 35
   wiki\projects\project-sinsang.md -> src/collector/top30_collector.py:43 (file missing)
   wiki\projects\project-turafic.md -> src/frida/hook_signature_functions.js:24 (file missing)
 
-log.md issues: 13
-  line 6: ?좎쭨 ??닚 (2026-08-26 < 2026-08-27)
-  line 7: ?좎쭨 ??닚 (2026-08-20 < 2026-08-26)
-  line 8: ?좎쭨 ??닚 (2026-08-16 < 2026-08-20)
-  line 11: ?좎쭨 ??닚 (2026-08-15 < 2026-08-16)
-  line 13: ?좎쭨 ??닚 (2026-08-08 < 2026-08-15)
-  line 15: ?좎쭨 ??닚 (2026-07-05 < 2026-08-08)
-  line 49: ?뺤떇 遺덉씪移?(`- YYYY-MM-DD | ?ъ씠??| ?붿빟`)
+log.md issues: 15
+  line 6: ?좎쭨 ??닚 (2026-08-27 < 2026-09-16)
+  line 7: ?좎쭨 ??닚 (2026-08-26 < 2026-08-27)
+  line 8: ?좎쭨 ??닚 (2026-08-20 < 2026-08-26)
+  line 9: ?좎쭨 ??닚 (2026-08-16 < 2026-08-20)
+  line 12: ?좎쭨 ??닚 (2026-08-15 < 2026-08-16)
+  line 14: ?좎쭨 ??닚 (2026-08-08 < 2026-08-15)
+  line 16: ?좎쭨 ??닚 (2026-07-05 < 2026-08-08)
   line 50: ?뺤떇 遺덉씪移?(`- YYYY-MM-DD | ?ъ씠??| ?붿빟`)
-  line 56: ?뺤떇 遺덉씪移?(`- YYYY-MM-DD | ?ъ씠??| ?붿빟`)
+  line 51: ?뺤떇 遺덉씪移?(`- YYYY-MM-DD | ?ъ씠??| ?붿빟`)
   line 57: ?뺤떇 遺덉씪移?(`- YYYY-MM-DD | ?ъ씠??| ?붿빟`)
-  line 71: ?뺤떇 遺덉씪移?(`- YYYY-MM-DD | ?ъ씠??| ?붿빟`)
-  line 97: ?뺤떇 遺덉씪移?(`- YYYY-MM-DD | ?ъ씠??| ?붿빟`)
+  line 58: ?뺤떇 遺덉씪移?(`- YYYY-MM-DD | ?ъ씠??| ?붿빟`)
+  line 72: ?뺤떇 遺덉씪移?(`- YYYY-MM-DD | ?ъ씠??| ?붿빟`)
   line 98: ?뺤떇 遺덉씪移?(`- YYYY-MM-DD | ?ъ씠??| ?붿빟`)
+  line 99: ?뺤떇 遺덉씪移?(`- YYYY-MM-DD | ?ъ씠??| ?붿빟`)
+  line 160: ?좎쭨 ??닚 (2026-09-15 < 2026-09-16)
 
-README counts: 媛쒕뀗 73/73, ?꾨줈?앺듃 44/44 -> OK
+README counts: 媛쒕뀗 91/91, ?꾨줈?앺듃 44/44 -> OK
 

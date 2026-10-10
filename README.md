@@ -2,7 +2,7 @@
 
 > Karpathy LLM Wiki 패턴 구현. "이 기능 어디서 주워와?"에 즉시 답하는 재사용 색인.
 > Obsidian으로 이 폴더(`D:\Project\_wiki`)를 볼트로 열면 그래프 뷰 + `[[링크]]` 그대로 동작.
-> 현재: 개념 90 · 프로젝트 44 (죽은 링크 0).
+> 현재: 개념 91 · 프로젝트 44 (죽은 링크 0).
 
 ## 🗺️ 도메인별 지도 (여기서 시작)
 - [[네이버-트래픽-커머스]] · [[트레이딩]] · [[앱-자동화-리버싱]] · [[웹앱-SaaS]] · [[소셜-수집]] · [[에이전트-인프라]]
@@ -80,6 +80,7 @@
 ### 데스크톱 GUI/테스트
 - [[Tk-Canvas-도넛-트리맵-시각화]] — Tk create_arc 각도 방향이 반대로 돎 → `_to_tk_angles` 변환, 360도는 `create_oval` 분기
 - [[Tk-테스트-안정화-및-창캡처]] — `master` 생략 시 간헐적 TclError → `master` 명시, 안 보이는 창은 PrintWindow로 캡처
+- [[암호xlsx-BadZipFile-File-is-not-a-zip-file-msoffcrypto복호화]] — openpyxl이 .xlsx를 "File is not a zip file"/"일반 .xlsx 구조가 아닙니다"로 못 엶 → 열기 암호 걸린 OLE(D0CF11E0), msoffcrypto로 BytesIO 복호화. 암호 루프 `except Exception`은 백엔드 누락을 "암호 틀림"으로 위장, PyInstaller는 `msoffcrypto.format.ooxml` hidden-import 필요
 
 ### 웹앱/SaaS · 라이브 커머스
 - [[웹앱-인증-세션-계층]] — 새 웹앱마다 인증 재구현 반복 → scrypt+HttpOnly+JWT 블랙리스트 세션 계층 재사용
@@ -125,6 +126,7 @@
 - [[project-turafic]] · [[project-naver-traffic-android-samsung]] · [[project-naver_turafic_samsung]] · [[project-turafic_update]]
 ### 커머스/수집/소셜
 - [[project-dorami]] · [[project-band-sourcing]] · [[project-insta]] · [[project-kmong]]
+  - Doremi: 가입비·월 정액·영상 초과금 손익 모델과 Excel 검증 자료 (2026-09-22, project-dorami 재사용 자료 참조).
 ### 트레이딩
 - [[project-SOLX]] · [[project-StockDante]] · [[project-mt5]] · [[project-PJT-v4.7-KIS자동매매]] · [[project-Crypto]] · [[project-PJT-V5.0]]
 ### 앱 자동화/리버싱
@@ -153,3 +155,4 @@
 ## raw (원본 소스)
 - `raw/` — 프로젝트 폴더는 `D:\Project\*` 절대경로로 참조(복제 안 함)
 - `raw/research/` — 외부 조사 원본. [[llm-wiki-x-사례조사]] · [[llm-wiki-에이전트-컨텍스트로드-사례조사]]
+
