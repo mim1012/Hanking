@@ -40,7 +40,7 @@ AUTH_TOKEN=open('/root/c2/auth_token.txt').read().strip()
 PSK=open('/root/c2/psk.txt').read().strip()
 HKDF_INFO=b"c2lab-v2|ecdh-session"
 PW="OnPxe"
-SCALE=(960,540)
+SCALE=(int(os.environ.get("C2_ENC_SCALE") or 960), 540)  # 단일 변수 부하 조정 — 해상도 축소(예: C2_ENC_SCALE=480)
 SEATS_FILE="/root/c2/seats.json"
 
 FFMPEG = shutil.which("ffmpeg") or "ffmpeg"
@@ -49,6 +49,15 @@ FULL_TIMEOUT = 60.0     # full/본문 수신 타임아웃(초)
 POLL_IDLE = 0.7         # 폴링 모드 증분 요청 무응답 판정(초) — v2 3.0에서 단축
 CONT_TIMEOUT = 2.0      # continuous 모드 서버 푸시 대기(초) — 정적 화면이면 이 간격으로 idle
 PUSHQ_MAX = 24          # 송출 대기 큐 상한(gop=4 → 0.5s/seg 기준 약 24초분, 실제로는 수초 내 소비)
+
+# ---- 정체(wedge) 감지·복구 파라미터 ----
+# 오탐 방지: 정적 화면/네트워크 지연을 정체로 오인하지 않도록 idle 연속 N회 후 능동 프로브로 생존 확인,
+# 복구 후엔 세그먼트 seq 미증가 검증 + 좌석당 복구 한도로 무한 재연결 방지
+STALL_IDLE_PROBES = 10      # 무수신 idle 연속 횟수(≈20s) 후 능동 프로브
+STALL_PROBE_TIMEOUT = 3.0   # 프로브 응답 대기(초) — 무응답 시 연결 사망 판정
+SEG_VERIFY_TIMEOUT = 20.0   # 복구 후 세그먼트 미송출 시 실패 판정(초)
+RECOVER_LIMIT = 4           # 좌석당 정체 복구 한도(회)
+RECOVER_WINDOW = 600.0      # 복구 한도 집계 윈도우(초)
 
 def ck(): return hashlib.sha256(("c2-lab-v1|"+PSK).encode()).digest()
 def seal(k,p):
@@ -675,8 +684,28 @@ def seat_loop(name):
         stt.want_stream = threading.Event() # 온디맨드 게이트 — stream_start 수신 시에만 RFB/인코더 구동
         stt.stream_deadline = 0.0           # 킵얼라이브(stream_start) 갱신 만료 시점 — 경과 시 게이트 해제
         stt.rfb_thread = None               # rfb 수신 스레드 핸들 — stream_start 시 사망 재스폰 판정용
+        stt.last_recv_ts = time.time()   # RFB 수신 성공 시각 (프로브 응답 포함) — 정적 화면 프로브 생존 확인용
+        stt.last_seg_ts = 0.0            # 미디어 세그먼트 ws 송출 성공 시각 — 복구 후 seq 증가 검증용
+        stt.recover_count = 0            # 정체 복구 시도 횟수 (RECOVER_WINDOW 내 누적)
+        stt.recover_window_start = 0.0
+        stt.recover_since_ts = 0.0       # 마지막 정체 복구(재연결) 시각
         with STT_BY_NAME_LOCK:
             STT_BY_NAME[name] = stt
+
+        def _note_recovery(reason):
+            """정체 복구 1회 기록. 한도 초과 시 want_stream 해제하고 False 반환."""
+            now = time.time()
+            if stt.recover_window_start == 0.0 or now - stt.recover_window_start > RECOVER_WINDOW:
+                stt.recover_window_start = now
+                stt.recover_count = 0
+            stt.recover_count += 1
+            stt.recover_since_ts = now
+            if stt.recover_count > RECOVER_LIMIT:
+                stt.want_stream.clear()
+                print(f"[{name}] 정체 복구 한도 초과({RECOVER_LIMIT}회/{RECOVER_WINDOW:.0f}s) — 스트림 중단 ({reason})", flush=True)
+                return False
+            print(f"[{name}] 정체 복구 {stt.recover_count}/{RECOVER_LIMIT} ({reason}) — rfb 재연결", flush=True)
+            return True
 
         # ---- 송출 대기 큐 (feed → push) ----
         pushq = []
@@ -711,6 +740,8 @@ def seat_loop(name):
             try:
                 with slock:
                     ws.send(bytes([BIN_STREAM_MAGIC]) + seal_raw(skey, frame), opcode=2)
+                if bkind == BIN_KIND_MEDIA:
+                    stt.last_seg_ts = time.time()
                 # LED init 게이트: 새 세대의 init가 실제 송출돼야 스트림 생존으로 표시
                 if bkind == BIN_KIND_INIT:
                     stt.init_payload = (data, codec, gen)   # 재등록 시 init 재송출용 — c2server ring 리셋 대비
@@ -755,8 +786,10 @@ def seat_loop(name):
                     stt.reset_evt.set()   # 해상도 변화/첫 연결만 리셋 — 같은 해상도 재연결은 세대 유지로 화면 이어짐
                 stt.rfb_alive = True
                 print(f"[{name}] rfb 연결 OK {W}x{H}", flush=True)
+                stt.last_recv_ts = time.time()
                 rfb_fb = bytearray(W * H * 4)      # RFB 스레드 전용 버퍼 (업데이트 단위로 stt.fb에 발행)
                 n = 0
+                idle_n = 0
                 cont = (name not in SEAT_POLL_ONLY)
                 cont_proven = False
                 if cont:
@@ -781,7 +814,23 @@ def seat_loop(name):
                                 SEAT_POLL_ONLY.add(name); cont = False
                                 print(f"[{name}] continuous 미지원 → poll 전환", flush=True)
                                 continue
+                            idle_n += 1
                             if cont:
+                                if idle_n >= STALL_IDLE_PROBES:
+                                    # 능동 프로브: full UpdateRequest — 정적 화면이어도 살아있는 서버는 빈 FramebufferUpdate로 응답함
+                                    try:
+                                        rfb.request_update(W, H, False)
+                                    except Exception:
+                                        break   # 전송 실패 → 연결 사망 → finally → 재연결
+                                    pres = rfb.wait_update(rfb_fb, W, H, first_timeout=STALL_PROBE_TIMEOUT)
+                                    if pres == "ok":
+                                        stt.last_recv_ts = time.time()
+                                        idle_n = 0
+                                        continue            # 정적 화면 확인 — 생존, 계속 대기
+                                    # idle/None(무응답·디코드 실패) → 연결 사망 판정. resize는 재연결 시 재협상.
+                                    if _note_recovery("probe-no-response"):
+                                        break   # finally → 외부 루프에서 want_stream 재확인 후 재연결
+                                    break       # 한도 초과 → want_stream 해제됨 → finally 후 외부 루프 idle
                                 continue              # 화면 정적 — 서버 푸시 계속 대기
                             time.sleep(0.03)          # 폴링 모드 서버 부하 억제 (v2 0.15 → 0.03)
                             continue
@@ -798,6 +847,8 @@ def seat_loop(name):
                                 try: rfb.enable_continuous(W, H, True)
                                 except Exception: cont = False
                             continue
+                        stt.last_recv_ts = time.time()
+                        idle_n = 0
                         # ok — 업데이트 반영 완료 → 공유 프레임버퍼에 발행
                         if not cont and n == 0:
                             n = 1   # 실측 팩트: 좌석 VNC 첫 폴링 응답은 빈 업데이트(검정). 폐기하고 다음 폴링부터 발행.
@@ -890,13 +941,23 @@ def seat_loop(name):
                         stt.silent_since = time.time()
                     elif time.time() - stt.silent_since > 20:
                         rt_ = stt.rfb_thread
-                        if rt_ is not None and rt_.is_alive():
+                        if rt_ is not None and rt_.is_alive() and _note_recovery("rfb-silent"):
                             print(f"[{name}] rfb thread wedged (20s no frames, want set) — replace", flush=True)
                             stt.rfb_thread = threading.Thread(target=rfb_loop, daemon=True)
                             stt.rfb_thread.start()
                         stt.silent_since = time.time()
                 elif stt.rfb_alive and hasattr(stt, "silent_since"):
                     stt.silent_since = time.time()
+                # 복구 후 seq 검증: 재연결했으나 미디어 세그먼트가 안 나오면 재복구(한도 내)
+                if stt.want_stream.is_set() and stt.recover_since_ts > 0.0 \
+                        and time.time() - stt.recover_since_ts > SEG_VERIFY_TIMEOUT \
+                        and stt.last_seg_ts < stt.recover_since_ts:
+                    if _note_recovery("no-seg-after-recover"):
+                        rt_ = stt.rfb_thread
+                        if rt_ is not None and rt_.is_alive():
+                            stt.rfb_thread = threading.Thread(target=rfb_loop, daemon=True)
+                            stt.rfb_thread.start()
+                    stt.recover_since_ts = time.time()   # 재귀 방지 — 다음 판정까지 20s 부여
                 e = box[0]; k, w = (e[0], e[1]) if e else (None, None)
                 if k and w:
                     try:
