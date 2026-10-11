@@ -232,9 +232,9 @@
     frameToken++;
     updateInfo(a);
     renderAgents();
-    // 클릭 게이트: 한게임+온라인만 스트림 시청. 그 외엔 검정 플레이스홀더(재생 아이콘 없음).
+    // 목록에 있는 온라인 노드 = WinHips 실시간 노드 = 화면이 나와야 함.
     var sEl = document.getElementById("live-screen");
-    if (a.online && a.hangame && a.streamable) {
+    if (a.online) {
       // 좌석 탭 = 사용자 제스처. 이 안에서 play() 해야 모바일 재생 잠금이 풀림.
       var sEl2 = document.getElementById("live-screen");
       var v0 = sEl2.querySelector("video.live-video");
