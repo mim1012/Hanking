@@ -176,3 +176,7 @@ body {
 .proc-table tr:hover td { background: #1a2a44; }
 .proc-table th:last-child, .proc-table td:last-child { width: 60px; text-align: center; }
 .kill-btn { font-size: 11px; padding: 2px 8px !important; }
+/* 모바일 빈 video의 네이티브 재생 버튼 숨김 */
+video.live-video::-webkit-media-controls { display: none !important; }
+video.live-video::-webkit-media-controls-start-playback-button { display: none !important; -webkit-appearance: none; }
+video.live-video::-webkit-media-controls-overlay-play-button { display: none !important; }
