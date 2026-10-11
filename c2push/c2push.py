@@ -244,7 +244,8 @@ def refresh_seats():
             os.replace(tmp, "/root/c2/tools/winhips_clients.json")
         except Exception as e:
             print(f"[refresh] roster dump ERR {type(e).__name__}: {str(e)[:60]}", flush=True)
-        direct = [c for c in data if (("hangame" in (c.get("gamelist") or "").lower()) or ("한게임" in str(c.get("gamenames") or ""))) and c.get("ip") == c.get("lanip")]
+        # 시청 좌석 = winhips 직결 전좌석 (ip==lanip, 게임 종류 무관) — winhips_clients.json의 direct 조건과 동일하게 유지 (목록 동기화 규칙)
+        direct = [c for c in data if c.get("ip") == c.get("lanip") and c.get("pcname")]
         # 주소 스티키: ok 상태 좌석은 재해석하지 않음 — winhips 터널 회전 폭탄 방지 (실패/신규 좌석만 재해석)
         with SEATS_LOCK:
             _have = set(SEATS)
@@ -519,7 +520,7 @@ class H264Streamer:
         self._cur = None
         self._stop = False
         tw = min(target_w, w)
-        gop = H264_FPS               # 1 GOP = 1초(fps 연동) — 매 프레임 키프레임 낭비 제거, 전환 지연 최대 1초
+        gop = int(os.environ.get("C2_GOP") or H264_FPS)  # 1 GOP = 1초(fps 연동) — C2_GOP 환경변수 운영 튜닝 (VPS drop-in=5와 동기화)
         cmd = [FFMPEG, "-hide_banner", "-loglevel", "error",
                "-f", "rawvideo", "-pixel_format", "bgr0",
                "-video_size", f"{w}x{h}", "-framerate", str(fps), "-i", "pipe:0",

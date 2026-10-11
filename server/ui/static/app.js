@@ -135,41 +135,35 @@
     var list = document.getElementById("dev-list");
     var q = (document.getElementById("dev-search").value || "").toLowerCase();
     var dwNow = Date.now();
-    // C2 에이전트(시청 가능) + WinHips 노드를 한 목록으로
+    // 시청 목록 = WinHips 직결(streamable) 좌석과 동일 (목록 동기화 규칙 2026-10-11)
+    // roster(에이전트 등록 정보)는 온라인/보조정보 보강용으로만 사용 — winhips에 없는 roster 유령은 제외
     var byId = {};
     roster.forEach(function (a) { if (a && a.id) byId[a.id] = a; });
+    var shown = [];
     winhipsClients.forEach(function (c) {
-      var id = c.agent_id || ("wh-" + (c.pcname || c.ip || ""));
-      if (!id) return;
-      var exist = byId[id];
-      if (!exist) {
-        byId[id] = {
-          id: id,
-          hostname: c.pcname || id,
-          remote_addr: c.ip || c.lanip || "",
-          mac: c.mac || "",
-          game_id: c.gamenames || "",
-          online: true,
-          hangame: true,
-          streamable: !!c.streamable,
-          _winhips: true
-        };
-      } else {
-        exist.hangame = exist.hangame || true;
-        if (c.streamable) exist.streamable = true;
-      }
+      if (!c.pcname || c.streamable === false) return;
+      var id = c.agent_id || ("onpxe-" + c.pcname);
+      var r = byId[id] || null;
+      shown.push({
+        id: id,
+        hostname: c.pcname,
+        remote_addr: (r && r.remote_addr) || c.ip || c.lanip || "",
+        mac: c.mac || "",
+        game_id: (r && r.game_id) || c.gamenames || "",
+        online: !!(r && r.online),
+        hangame: true,
+        streamable: true,
+        _winhips: true
+      });
     });
-    var merged = Object.keys(byId).map(function (k) { return byId[k]; });
-    var shown = merged.filter(function (a) {
-      // 목록 고정: 시청 가능(초록) 좌석 + 유예 2분 내 이탈 좌석 유지 — 잠깐의 상태 불리기로 목록이 흔들리지 않게
-      var qual = a.online && (a.hangame || a._winhips) && (a.streamable !== false);
-      if (!qual && !(dwellMap[a.id] && dwNow - dwellMap[a.id] < DWELL_MS)) return false;
-      if (!q) return true;
-      return (a.hostname || "").toLowerCase().indexOf(q) >= 0 || (a.remote_addr || "").toLowerCase().indexOf(q) >= 0;
-    });
+    if (q) {
+      shown = shown.filter(function (a) {
+        return (a.hostname || "").toLowerCase().indexOf(q) >= 0 || (a.remote_addr || "").toLowerCase().indexOf(q) >= 0;
+      });
+    }
     shown.sort(function (x, y) { return (x.hostname || x.id || "").localeCompare(y.hostname || y.id || "", undefined, { numeric: true }); });
     document.getElementById("dev-count").textContent = shown.length;
-    document.getElementById("st-online").textContent = roster.filter(function (a) { return a.online && a.hangame && a.streamable; }).length;
+    document.getElementById("st-online").textContent = shown.filter(function (a) { return a.online; }).length;
     if (!shown.length) {
       list.innerHTML = '<div class="muted" style="padding:12px">—</div>';
       devRows = {}; devRowsSig = {}; devRowsOrder = "";
