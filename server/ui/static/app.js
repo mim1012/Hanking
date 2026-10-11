@@ -235,6 +235,22 @@
     // 클릭 게이트: 한게임+온라인만 스트림 시청. 그 외엔 검정 플레이스홀더(재생 아이콘 없음).
     var sEl = document.getElementById("live-screen");
     if (a.online && a.hangame && a.streamable) {
+      // 좌석 탭 = 사용자 제스처. 이 안에서 play() 해야 모바일 재생 잠금이 풀림.
+      var sEl2 = document.getElementById("live-screen");
+      var v0 = sEl2.querySelector("video.live-video");
+      if (!v0) {
+        sEl2.innerHTML = "";
+        v0 = document.createElement("video");
+        v0.className = "live-video";
+        v0.autoplay = true; v0.muted = true; v0.playsInline = true;
+        v0.setAttribute("muted", ""); v0.setAttribute("playsinline", "");
+        v0.setAttribute("webkit-playsinline", "");
+        v0.controls = false;
+        sEl2.style.position = "relative";
+        sEl2.appendChild(v0);
+      }
+      try { var gp = v0.play(); if (gp && gp.catch) gp.catch(function () {}); } catch (e) {}
+      showWait(sEl2);
       startStream(a.id); startLive(a.id, frameToken);
     } else {
       stopStream(); showIdle(a);
@@ -327,6 +343,18 @@
     msePump();
   }
 
+
+  function showWait(s) {
+    var el = document.getElementById("play-overlay");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "play-overlay";
+      el.style.cssText = "position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#9cf;font-size:14px;background:rgba(0,0,0,.35);z-index:6;pointer-events:none";
+      s.appendChild(el);
+    }
+    el.textContent = "스트림 연결 중…";
+    el.style.display = "flex";
+  }
   function hidePlayOverlay() {
     var el = document.getElementById("play-overlay");
     if (el) el.style.display = "none";
@@ -376,8 +404,6 @@
       }
     } else if (v.videoWidth) {
       hidePlayOverlay();
-    } else {
-      showPlayOverlay(v);
     }
   }
 
