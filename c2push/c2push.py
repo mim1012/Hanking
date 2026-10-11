@@ -467,7 +467,7 @@ class H264Streamer:
         self._cur = None
         self._stop = False
         tw = min(target_w, w)
-        gop = 2                      # 저지연: 세그 주기 ≈2프레임 (15fps≈130ms). 비트레이트↑
+        gop = 24                     # 1 GOP = 1초(24fps) — 매 프레임 키프레임 낭비 제거, 전환 지연 최대 1초
         cmd = [FFMPEG, "-hide_banner", "-loglevel", "error",
                "-f", "rawvideo", "-pixel_format", "bgr0",
                "-video_size", f"{w}x{h}", "-framerate", str(fps), "-i", "pipe:0",

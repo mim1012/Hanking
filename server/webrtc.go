@@ -19,6 +19,8 @@ import (
 var (
 	rtcMu     sync.Mutex
 	rtcTracks = map[string]*webrtc.TrackLocalStaticSample{}
+	// per-agent last sample write time — RTP pacing is measured, not fixed
+	rtcLastWrite = map[string]time.Time{}
 )
 
 func rtcPublicIP() string {
@@ -35,7 +37,11 @@ func rtcTrack(agentID string) *webrtc.TrackLocalStaticSample {
 		return t
 	}
 	t, err := webrtc.NewTrackLocalStaticSample(
-		webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeH264, ClockRate: 90000},
+		webrtc.RTPCodecCapability{
+			MimeType:    webrtc.MimeTypeH264,
+			ClockRate:   90000,
+			SDPFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f",
+		},
 		"video",
 		agentID,
 	)
@@ -53,11 +59,7 @@ func newViewerPC() (*webrtc.PeerConnection, error) {
 	if err := se.SetEphemeralUDPPortRange(50000, 50100); err != nil {
 		return nil, err
 	}
-	me := &webrtc.MediaEngine{}
-	if err := me.RegisterDefaultCodecs(); err != nil {
-		return nil, err
-	}
-	api := webrtc.NewAPI(webrtc.WithMediaEngine(me), webrtc.WithSettingEngine(se))
+	api := webrtc.NewAPI(webrtc.WithSettingEngine(se))
 	return api.NewPeerConnection(webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{{
 			URLs: []string{"stun:stun.l.google.com:19302"},
@@ -65,52 +67,80 @@ func newViewerPC() (*webrtc.PeerConnection, error) {
 	})
 }
 
-// feedWebRTC converts one fMP4 media segment into an Annex-B sample and
-// pushes it to every subscriber of agentID. Safe to call with a copied payload.
+// feedWebRTC splits one fMP4 media segment into access units (each VCL NAL is
+// one frame — c2push feeds single-slice x264 output — with SPS/PPS/SEI NALs
+// that precede it attached to that AU) and writes every AU as its own sample.
+// Sample durations come from the measured inter-segment arrival gap split
+// evenly across the AUs, so RTP pacing follows the real encoder cadence
+// instead of the old fixed 80ms-per-fragment pacing (~24fps input played like
+// 12.5fps).
 func feedWebRTC(agentID string, fmp4 []byte) {
-	annex := annexBFromFMP4(fmp4)
-	if len(annex) == 0 {
+	aus := accessUnitsFromFMP4(fmp4)
+	if len(aus) == 0 {
 		return
 	}
 	t := rtcTrack(agentID)
 	if t == nil {
 		return
 	}
-	_ = t.WriteSample(media.Sample{
-		Data:     annex,
-		Duration: 80 * time.Millisecond,
-	})
+	now := time.Now()
+	total := time.Second / 24 // fallback content span when measurement is absent
+	rtcMu.Lock()
+	if prev, ok := rtcLastWrite[agentID]; ok {
+		if d := now.Sub(prev); d > 20*time.Millisecond && d < 5*time.Second {
+			total = d
+		}
+	}
+	rtcLastWrite[agentID] = now
+	rtcMu.Unlock()
+	dur := total / time.Duration(max(len(aus), 1))
+	for _, au := range aus {
+		_ = t.WriteSample(media.Sample{Data: au, Duration: dur})
+	}
 }
 
-func annexBFromFMP4(seg []byte) []byte {
+// accessUnitsFromFMP4 locates the mdat payload of one fMP4 media segment and
+// converts it to Annex-B access units.
+func accessUnitsFromFMP4(seg []byte) [][]byte {
 	i := 0
 	for i+8 <= len(seg) {
 		size := int(binary.BigEndian.Uint32(seg[i : i+4]))
 		if size < 8 || i+size > len(seg) {
-			break
+			return nil
 		}
 		if string(seg[i+4:i+8]) == "mdat" {
-			return avccToAnnexB(seg[i+8 : i+size])
+			return annexBAccessUnits(seg[i+8 : i+size])
 		}
 		i += size
 	}
 	return nil
 }
 
-func avccToAnnexB(b []byte) []byte {
-	var out []byte
-	start := []byte{0, 0, 0, 1}
-	for len(b) >= 4 {
-		n := int(binary.BigEndian.Uint32(b[:4]))
-		b = b[4:]
-		if n <= 0 || n > len(b) {
-			break
+// annexBAccessUnits converts avcc length-prefixed NALs into Annex-B frames:
+// each VCL NAL (type 1-5) starts a new AU; AUD/SPS/PPS/SEI NALs leading up to
+// it stick to that AU.
+func annexBAccessUnits(avcc []byte) [][]byte {
+	var aus [][]byte
+	cur := []byte{}
+	for len(avcc) >= 4 {
+		n := int(binary.BigEndian.Uint32(avcc[:4]))
+		avcc = avcc[4:]
+		if n <= 0 || n > len(avcc) {
+			return aus
 		}
-		out = append(out, start...)
-		out = append(out, b[:n]...)
-		b = b[n:]
+		nalType := int(avcc[0] & 0x1f)
+		if nalType >= 1 && nalType <= 5 && len(cur) > 0 {
+			aus = append(aus, cur)
+			cur = nil
+		}
+		cur = append(cur, 0, 0, 0, 1)
+		cur = append(cur, avcc[:n]...)
+		avcc = avcc[n:]
 	}
-	return out
+	if len(cur) > 0 {
+		aus = append(aus, cur)
+	}
+	return aus
 }
 
 // POST /admin/webrtc/offer  {agent_id, sdp} → {sdp}
@@ -140,23 +170,23 @@ func handleAdminWebRTCOffer(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "track", 500)
 		return
 	}
+	if _, err := pc.AddTrack(track); err != nil {
+		pc.Close()
+		http.Error(w, "addtrack", 500)
+		return
+	}
 	if err := pc.SetRemoteDescription(webrtc.SessionDescription{
 		Type: webrtc.SDPTypeOffer,
 		SDP:  req.SDP,
 	}); err != nil {
 		pc.Close()
-		http.Error(w, "offer: "+err.Error(), 400)
-		return
-	}
-	if _, err := pc.AddTrack(track); err != nil {
-		pc.Close()
-		http.Error(w, "addtrack: "+err.Error(), 500)
+		http.Error(w, "offer", 400)
 		return
 	}
 	answer, err := pc.CreateAnswer(nil)
 	if err != nil {
 		pc.Close()
-		http.Error(w, "answer: "+err.Error(), 500)
+		http.Error(w, "answer", 500)
 		return
 	}
 	gather := webrtc.GatheringCompletePromise(pc)
