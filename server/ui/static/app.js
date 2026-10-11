@@ -479,9 +479,15 @@
     var rtcStartAt = Date.now();
     var lastPos = -1, lastPosAt = rtcStartAt;
     killRtcWatchdog();
-    // watchdog: upstream가 못 커버하는 두 상황 — 트랙이 아예 안 오는 7초, 재생 중 12초 프레임 정체
+    // watchdog: 트랙 무도착 7초 / 재생 중 12초 프레임 정체 — c2push 90초 TTL 만료 프리즈 방지 킵얼라이브 결합
     rtcWatchdog = setInterval(function () {
       if (rtcPC !== pc) { killRtcWatchdog(); return; }
+      // stream_start 킵얼라이브 — WebRTC로 시청 중 15초마다 재킷(startWSMSE의 ka 정책 동일).
+      // 없으면 c2push가 90초 TTL로 인코더를 정지시켜 마지막 프레임에 프리즈된다.
+      if (Date.now() - lastStreamCmdAt > 15000) {
+        lastStreamCmdAt = Date.now();
+        sendCmd(aId, "stream_start", JSON.stringify({ fps: 24, quality: 70, max_dim: 1280 }));
+      }
       var st = pc.connectionState;
       if (st === "failed" || st === "closed") { rtcFallback(aId, tok, pc); return; }
       if (!video.srcObject) {
