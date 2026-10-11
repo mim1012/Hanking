@@ -291,6 +291,16 @@ def refresh_seats():
             fresh_all = dict(fresh); fresh_all.update(carried)
             if carried:
                 print(f"[refresh] 해석 실패 보류 좌석 이전값 재사용 {len(carried)}대: {sorted(carried)[:12]}", flush=True)
+            # 시청 중 좌석은 로스터 깜빡임으로 치우지 않음. stream_start 킵얼라이브(deadline)가
+            # 살아있는 동안 이전 VNC 주소를 유지해 rfb 스레드가 "좌석 치워짐"으로 죽지 않게 한다.
+            now = time.time()
+            with STT_BY_NAME_LOCK:
+                hot = {nm for nm, stt in STT_BY_NAME.items()
+                       if stt.want_stream.is_set() and now < stt.stream_deadline}
+            held = {nm: SEATS[nm] for nm in hot if nm not in fresh_all and nm in SEATS}
+            if held:
+                fresh_all.update(held)
+                print(f"[refresh] 시청 중 좌석 유예 유지 {len(held)}대: {sorted(held)[:12]}", flush=True)
             changed = (set(SEATS) != set(fresh_all)) or any(SEATS.get(n) != fresh_all[n] for n in fresh_all)
             SEATS.clear(); SEATS.update(fresh_all)
         # 부팅 캐시만 유지 — 평시 소스는 winhips live 재구성 (seats.json은 스냅샷이 아닌 캐시)
