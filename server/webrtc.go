@@ -94,9 +94,35 @@ func feedWebRTC(agentID string, fmp4 []byte) {
 	rtcLastWrite[agentID] = now
 	rtcMu.Unlock()
 	dur := total / time.Duration(max(len(aus), 1))
-	for _, au := range aus {
-		_ = t.WriteSample(media.Sample{Data: au, Duration: dur})
+	// SPS/PPS 인밴드 주입 — fMP4 init은 RTP에 안 실려 디코더가 videoWidth를 못 만든다 (실측: mdat에 type7/8=0)
+	var params []byte
+	streamMu.RLock()
+	if init := streamInit[agentID]; init != nil {
+		params = init.Params
 	}
+	streamMu.RUnlock()
+	for _, au := range aus {
+		data := au
+		if len(params) > 0 && !auStartsWithParamSet(au) {
+			buf := make([]byte, 0, len(params)+len(au))
+			buf = append(buf, params...)
+			buf = append(buf, au...)
+			data = buf
+		}
+		_ = t.WriteSample(media.Sample{Data: data, Duration: dur})
+	}
+}
+
+// auStartsWithParamSet reports whether the AU already begins with an SPS NAL (type 7).
+func auStartsWithParamSet(au []byte) bool {
+	if len(au) < 5 {
+		return false
+	}
+	l := int(binary.BigEndian.Uint32(au[:4]))
+	if l <= 0 || 4+l > len(au) {
+		return false
+	}
+	return au[4]&0x1f == 7
 }
 
 // accessUnitsFromFMP4 locates the mdat payload of one fMP4 media segment and

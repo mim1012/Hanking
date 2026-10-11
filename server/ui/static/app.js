@@ -499,6 +499,7 @@
       video.srcObject = stream;
       var p = video.play();
       if (p && p.catch) p.catch(function () { showPlayOverlay(video); });
+      // 냉시동 첫 프레임은 cmd+약5초 — 4초엔 이기지 못해 매번 MSE로 밀렸다(실측 3회)
       setTimeout(function () {
         if (rtcPC !== pc || aId !== selectedId || tok !== frameToken) return;
         if (!video.videoWidth) {
@@ -507,7 +508,7 @@
           video.srcObject = null;
           startMSE(aId, tok);
         }
-      }, 4000);
+      }, 8000);
     };
     pc.onconnectionstatechange = function () {
       if (pc.connectionState === "failed") {

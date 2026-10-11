@@ -200,6 +200,7 @@ type StreamInit struct {
 	Codec      string
 	Size       int
 	Raw        []byte
+	Params     []byte // avcC에서 추출한 Annex-B SPS+PPS — WebRTC RTP 인밴드 전달용
 	ReceivedAt time.Time
 }
 
@@ -212,6 +213,84 @@ type StreamSeg struct {
 	MIME       string
 	Raw        []byte
 	ReceivedAt time.Time
+}
+
+// findBox returns the payload of the first direct child box with the given type.
+func findBox(b []byte, typ string) []byte {
+	i := 0
+	for i+8 <= len(b) {
+		sz := int(binary.BigEndian.Uint32(b[i : i+4]))
+		if sz == 0 {
+			sz = len(b) - i
+		}
+		if sz < 8 || i+sz > len(b) {
+			return nil
+		}
+		if string(b[i+4:i+8]) == typ {
+			return b[i+8 : i+sz]
+		}
+		i += sz
+	}
+	return nil
+}
+
+// avcCParamSets walks ftyp+moov → trak → mdia → minf → stbl → stsd → first
+// sample entry → avcC and returns its SPS/PPS as an Annex-B blob.
+// fMP4 init segment은 WebRTC RTP에 안 실리므로 인밴드 주입용으로 추출한다.
+// 반환 nil = 조사 실패 (주입 생략 — 안전)
+func avcCParamSets(raw []byte) []byte {
+	stsd := findBox(findBox(findBox(findBox(findBox(findBox(raw, "moov"), "trak"), "mdia"), "minf"), "stbl"), "stsd")
+	if stsd == nil || len(stsd) < 8+86 {
+		return nil
+	}
+	entries := stsd[8:] // version/flags(4)+entry_count(4)
+	entrySize := int(binary.BigEndian.Uint32(entries[0:4]))
+	if entrySize < 86 || entrySize > len(entries) {
+		return nil
+	}
+	avcc := findBox(entries[86:entrySize], "avcC") // size(4)+type(4)+sampleEntry(78)
+	if avcc == nil || len(avcc) < 7 {
+		return nil
+	}
+	p := 5
+	numSPS := int(avcc[p] & 0x1f)
+	p++
+	var out []byte
+	for i := 0; i < numSPS; i++ {
+		if p+2 > len(avcc) {
+			return nil
+		}
+		l := int(binary.BigEndian.Uint16(avcc[p : p+2]))
+		p += 2
+		if l <= 0 || p+l > len(avcc) {
+			return nil
+		}
+		out = append(out, 0, 0, 0, 1)
+		out = append(out, avcc[p:p+l]...)
+		p += l
+	}
+	if p >= len(avcc) {
+		return nil
+	}
+	numPPS := int(avcc[p])
+	p++
+	for i := 0; i < numPPS; i++ {
+		if p+2 > len(avcc) {
+			return nil
+		}
+		l := int(binary.BigEndian.Uint16(avcc[p : p+2]))
+		p += 2
+		if l <= 0 || p+l > len(avcc) {
+			return nil
+		}
+		out = append(out, 0, 0, 0, 1)
+		out = append(out, avcc[p:p+l]...)
+		p += l
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 func logPrintf(format string, v ...interface{}) {
@@ -1213,6 +1292,7 @@ func applyStreamFrame(agentID string, msg map[string]interface{}) {
 				Codec:      env.Codec,
 				Size:       env.Size,
 				Raw:        rawSeg,
+				Params:     avcCParamSets(rawSeg),
 				ReceivedAt: now,
 			}
 			streamSegs[agentID] = nil
@@ -1284,6 +1364,7 @@ func applyStreamFrameBinary(agentID string, frame []byte) {
 			Codec:      codec,
 			Size:       len(payload),
 			Raw:        payload,
+			Params:     avcCParamSets(payload),
 			ReceivedAt: now,
 		}
 		streamSegs[agentID] = nil
