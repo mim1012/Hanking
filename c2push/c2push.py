@@ -28,6 +28,7 @@
 #  6. ZLIB(6) 인코딩 광고 + 디코드(연속 zlib 스트림) — 서버가 지원하면 인바운드 대역폭 대폭 절감.
 #     미지원/디코드 실패 좌석은 Raw로 자동 폴백(SEAT_NO_ZLIB).
 import atexit, signal
+import re as _re
 import websocket, ssl, struct, time, json, threading, os, sys, base64, hashlib, subprocess, shutil, zlib
 from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey, X25519PublicKey
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
@@ -194,6 +195,17 @@ def _evict_oldest_encoders(agent_id):
         if stt is not None:
             stt.want_stream.clear()
             print(f"[{nm}] 인코더 상한({MAX_ACTIVE_ENCODERS}) 초과 — LRU 회수", flush=True)
+
+def _seat_record(name):
+    """좌석 레코드 조회 — PC-001/pc001 혼용 좌석명 호환 (정확 일치 우선, 없으면 정규화 비교)."""
+    rec = SEATS.get(name)
+    if rec is not None:
+        return rec
+    want = _re.sub("[^0-9a-z]", "", (name or "").lower())
+    for k, v in SEATS.items():
+        if _re.sub("[^0-9a-z]", "", k.lower()) == want:
+            return v
+    return None
 SEAT_DIRS = {}   # 좌석 주소 자산 캐시: name -> {"status": "ok"/"fail", "ts": 시각} — ok 상태는 재해석하지 않음(주소 회전 방지)
 
 def refresh_seats():
@@ -714,12 +726,12 @@ def seat_loop(name):
         def rfb_loop():
             fail_n = 0
             while True:
-                if name not in SEATS:
+                if _seat_record(name) is None:
                     print(f"[{name}] rfb thread exit (좌석 무기록)", flush=True)
                     return
                 if not stt.want_stream.is_set():
                     time.sleep(0.5); continue
-                with SEATS_LOCK: s_ = SEATS.get(name)
+                with SEATS_LOCK: s_ = _seat_record(name)
                 if s_ is None:
                     print(f"[{name}] rfb thread exit (좌석 치워짐, 유령 등록 차단)", flush=True)
                     break   # 치워진 좌석 (winhips에서 한게임 해제/퇴장) — 스레드 정지, 유령 등록 차단
@@ -856,7 +868,7 @@ def seat_loop(name):
         # ---- 스레드 3: 송출 (큐에서 꺼내 ws 전송만 — 수신/인코딩과 독립) ----
         def push_loop():
             while True:
-                if name not in SEATS:
+                if _seat_record(name) is None:
                     return
                 it = _pushq_get(timeout=1.0)
                 if it is None: continue
@@ -866,7 +878,7 @@ def seat_loop(name):
 
         def heartbeat_loop():
             while True:
-                if name not in SEATS:
+                if _seat_record(name) is None:
                     return   # 치워진 좌석 — 하트비트 스레드도 정지
                 if stt.want_stream.is_set() and time.time() > stt.stream_deadline:
                     stt.want_stream.clear()
@@ -902,7 +914,7 @@ def seat_loop(name):
         threading.Thread(target=heartbeat_loop, daemon=True).start()
 
         while True:  # WS 재등록 루프
-            if name not in SEATS:
+            if _seat_record(name) is None:
                 return   # 치워진 좌석 — 재등록 중단, 서버에서 유령 리스트 방지
             try:
                 priv = X25519PrivateKey.generate(); pub = priv.public_key().public_bytes_raw()
@@ -939,7 +951,7 @@ def seat_loop(name):
                     try:
                         m = ws.recv()
                     except websocket.WebSocketTimeoutException:
-                        if name not in SEATS:   # 치워진 좌석 — 무한 recv 블록으로 스레드가 SEAT_THREADS를 붙잡는 것 방지
+                        if _seat_record(name) is None:   # 치워진 좌석 — 무한 recv 블록으로 스레드가 SEAT_THREADS를 붙잡는 것 방지
                             print(f"[{name}] cmd loop exit (좌석 치워짐, recv idle)", flush=True)
                             break
                         continue
