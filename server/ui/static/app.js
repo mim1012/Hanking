@@ -251,19 +251,28 @@
       }
       try { var gp = v0.play(); if (gp && gp.catch) gp.catch(function () {}); } catch (e) {}
       showWait(sEl2);
-      startStream(a.id); startLive(a.id, frameToken);
+      startStream(a.id, true); startLive(a.id, frameToken);   // 클릭은 명시적 의도 → 항상 재킥
     } else {
       stopStream(); showIdle(a);
     }
   }
 
   function sendCmd(agentId, cmdType, payload) {
-    return api("/admin/cmd", { method: "POST",
-      json: { agent_id: agentId, cmd_type: cmdType, payload: payload || "" } }).catch(function () {});
+    var body = { agent_id: agentId, cmd_type: cmdType, payload: payload || "" };
+    return api("/admin/cmd", { method: "POST", json: body }).catch(function () {
+      // 서버 재시작·네트워크 블립으로 명령이 유실될 수 있어 1.2초 후 1회 재시도
+      // (실패해도 묵살 — 기존 UI 흐름 유지)
+      return new Promise(function (res) { setTimeout(res, 1200); }).then(function () {
+        return api("/admin/cmd", { method: "POST", json: body }).catch(function () {});
+      });
+    });
   }
 
-  function startStream(id) {
-    if (currentStreamId === id) return;
+  function startStream(id, force) {
+    // 같은 좌석 재클릭이어도 명령 재킥은 유지한다. 서버 재시작 등으로 stream_start가
+    // 유실되면 currentStreamId만 믿고 건너뛰는 순간 블랙으로 갇힌다. 클릭 직전 10초
+    // 이내에 이미 재킷했을 때만 중복을 피한다.
+    if (!force && currentStreamId === id && Date.now() - lastStreamCmdAt < 10000) return;
     stopStream();
     currentStreamId = id;
     lastStreamCmdAt = Date.now();
@@ -415,6 +424,7 @@
     mseCurStream = -1;
     mseSinceSeq = -1;
     mseSeekDone = false;
+    killRtcWatchdog();
     if (rtcPC) { try { rtcPC.close(); } catch (e) {} rtcPC = null; }
     if (mseWS) {
       // 의도적 종료 — 핸들러를 먼저 지운야 폴백(pollMSE)이 발동하지 않음
@@ -436,6 +446,17 @@
 
 
   var rtcPC = null;
+  var rtcWatchdog = null;
+  function killRtcWatchdog() {
+    if (rtcWatchdog) { clearInterval(rtcWatchdog); rtcWatchdog = null; }
+  }
+  function rtcFallback(aId, tok, pc) {
+    // WebRTC 경로가 조용히 죽으면(트랙 무도착/재생 중 프레임 정체) MSE 롱폴로 강등
+    killRtcWatchdog();
+    try { pc.close(); } catch (e) {}
+    if (rtcPC === pc) rtcPC = null;
+    if (aId === selectedId && tok === frameToken) startMSE(aId, tok);
+  }
   function startWebRTC(aId, tok) {
     var s = document.getElementById("live-screen");
     var video = s.querySelector("video.live-video");
@@ -455,6 +476,22 @@
     if (typeof RTCPeerConnection === "undefined") { pollMSE(aId, tok); return; }
     var pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] });
     rtcPC = pc;
+    var rtcStartAt = Date.now();
+    var lastPos = -1, lastPosAt = rtcStartAt;
+    killRtcWatchdog();
+    // watchdog: upstream가 못 커버하는 두 상황 — 트랙이 아예 안 오는 7초, 재생 중 12초 프레임 정체
+    rtcWatchdog = setInterval(function () {
+      if (rtcPC !== pc) { killRtcWatchdog(); return; }
+      var st = pc.connectionState;
+      if (st === "failed" || st === "closed") { rtcFallback(aId, tok, pc); return; }
+      if (!video.srcObject) {
+        if (Date.now() - rtcStartAt > 7000) rtcFallback(aId, tok, pc);
+        return;
+      }
+      var pos = video.currentTime;
+      if (pos !== lastPos) { lastPos = pos; lastPosAt = Date.now(); return; }
+      if (!video.paused && Date.now() - lastPosAt > 12000) rtcFallback(aId, tok, pc);
+    }, 1000);
     pc.addTransceiver("video", { direction: "recvonly" });
     pc.ontrack = function (ev) {
       if (aId !== selectedId || tok !== frameToken) return;
@@ -625,6 +662,12 @@
       // JSON 응답 = 구형 서버(format=raw 미지원) 또는 스트림 부재(404) → 기존 경로 유지
       return r.json().then(function (f) {
         if (aId !== selectedId || tok !== frameToken || mseStopped) return;
+        // 프레임도 init도 없는 JSON = 스트림 부재(404류). 서버 재시작 등으로
+        // stream_start가 유실됐을 수 있으니 5초 간격으로 재킥.
+        if (f && !f.mode && !f.data_b64 && Date.now() - lastStreamCmdAt > 5000) {
+          lastStreamCmdAt = Date.now();
+          sendCmd(aId, "stream_start", JSON.stringify({ fps: 15, quality: 70, max_dim: 1280 }));
+        }
         if (f && f.mode === "h264") {
           handleH264(f, aId, tok);
           setConn(true);
