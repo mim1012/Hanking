@@ -506,6 +506,14 @@
       video.srcObject = stream;
       var p = video.play();
       if (p && p.catch) p.catch(function () { showPlayOverlay(video); });
+      // WebRTC 성공 경로엔 hidePlayOverlay 호출이 없었다(과거엔 매번 MSE 폴백이라 안 보임).
+      // 5264308로 WebRTC가 실제로 살아나자 반투명 오버레이가 프레임 위에 영구 잔류 — 재생 확인 시점부터 숨김.
+      var hideWait = function () {
+        if (rtcPC !== pc || aId !== selectedId || tok !== frameToken) return;
+        if (video.videoWidth) { hidePlayOverlay(); return; }
+        setTimeout(hideWait, 250);
+      };
+      if (p && p.then) p.then(hideWait); else hideWait();
       // 냉시동 첫 프레임은 cmd+약5초 — 4초엔 이기지 못해 매번 MSE로 밀렸다(실측 3회)
       setTimeout(function () {
         if (rtcPC !== pc || aId !== selectedId || tok !== frameToken) return;
