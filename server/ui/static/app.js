@@ -140,10 +140,17 @@
     var byId = {};
     roster.forEach(function (a) { if (a && a.id) byId[a.id] = a; });
     var shown = [];
+    var RFB_FAIL_HIDE_SEC = 600;  // rfb fail 후 재노출 유예 — 영구 격리 방지
     winhipsClients.forEach(function (c) {
       if (!c.pcname || c.streamable === false) return;
       var id = c.agent_id || ("onpxe-" + c.pcname);
       var r = byId[id] || null;
+      // 화면 볼 수 있는 좌석만: agent WS 등록(online) + 최근 rfb 실측 실패 제외.
+      // rfb 상태 없음(미시청)은 표시 — 실측 실패만 숨김.
+      // 현재 선택 좌석은 예외 유지 — 필터로 목록에서 빠져도 선택 맥락이 사라지지 않게.
+      var hidden = (!r || !r.online) ||
+        (c.rfb && c.rfb.status === "fail" && c.rfb.ts && (Date.now() / 1000 - c.rfb.ts) < RFB_FAIL_HIDE_SEC);
+      if (hidden && id !== selectedId) return;
       shown.push({
         id: id,
         hostname: c.pcname,

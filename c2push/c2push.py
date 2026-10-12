@@ -239,6 +239,9 @@ def refresh_seats():
                 pc = c.get("pcname") or ""
                 ip = c.get("ip") or ""
                 lan = c.get("lanip") or ""
+                # rfb: SEAT_DIRS에서 좌석별 VNC 연결 실측 상태 (None=미시청/미검증, ok/fail=최근 시도 결과)
+                # 뷰어 목록 필터가 사용 — fail 최근 건만 숨김 (복구 좌석 영구 격리 방지)
+                _sd = SEAT_DIRS.get(pc)
                 roster.append({
                     "pcname": pc, "ip": ip, "lanip": lan,
                     "mac": c.get("mac") or "", "state": c.get("state"),
@@ -246,6 +249,7 @@ def refresh_seats():
                     "direct": bool(ip and ip == lan),
                     "agent_id": ("onpxe-" + pc) if pc else "",
                     "streamable": bool(ip and ip == lan and pc),
+                    "rfb": ({"status": _sd.get("status"), "ts": _sd.get("ts")} if _sd else None),
                 })
             tmp = "/root/c2/tools/winhips_clients.json.tmp"
             with open(tmp, "w", encoding="utf-8") as f:
